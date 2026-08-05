@@ -8,6 +8,45 @@
 
 export const PENCE_PER_POUND = 100;
 
+/**
+ * Tax rates are stored as integer basis points — 1900 rather than 0.19 — so
+ * that every step of the calculation is exact integer arithmetic.
+ *
+ * JavaScript has no decimal type, and a rate like 0.21 is not exactly
+ * representable in binary floating point. Multiplying pence by basis points and
+ * dividing once at the end keeps the whole calculation free of floats. The
+ * largest product involved (about £1m of income at the top rate) is roughly
+ * 4.8e11, comfortably inside Number.MAX_SAFE_INTEGER, so BigInt is unnecessary.
+ */
+export const BASIS_POINTS = 10_000;
+
+/**
+ * Integer division rounding halves away from zero, for non-negative integers.
+ *
+ * Written as (2n + d) / 2d so the half never has to be represented as a
+ * fraction.
+ *
+ * @param {number} numerator
+ * @param {number} denominator
+ * @returns {number}
+ */
+export function roundHalfUp(numerator, denominator) {
+  if (!Number.isSafeInteger(numerator) || !Number.isSafeInteger(denominator) || denominator <= 0) {
+    throw new TypeError(`roundHalfUp needs integers and a positive denominator, got ${numerator}/${denominator}`);
+  }
+  return Math.floor((2 * numerator + denominator) / (2 * denominator));
+}
+
+/**
+ * Convert integer basis points to a fraction, for display only.
+ *
+ * @param {number} basisPoints e.g. 1900
+ * @returns {number} e.g. 0.19
+ */
+export function basisPointsToRate(basisPoints) {
+  return basisPoints / BASIS_POINTS;
+}
+
 /** Matches a plain decimal, or one with correctly-grouped thousands separators. */
 const MONEY_SHAPE = /^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.(\d+))?$/;
 
