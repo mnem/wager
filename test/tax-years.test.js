@@ -36,7 +36,8 @@ for (const [id, year] of ALL_YEARS) {
     const { amountPence, taper } = year.personalAllowance;
     assert.ok(Number.isSafeInteger(amountPence) && amountPence > 0);
     assert.ok(Number.isSafeInteger(taper.thresholdPence) && taper.thresholdPence > amountPence);
-    assert.ok(taper.lossPerPound > 0 && taper.lossPerPound <= 1);
+    assert.ok(Number.isSafeInteger(taper.withdraw.lose) && taper.withdraw.lose > 0);
+    assert.ok(Number.isSafeInteger(taper.withdraw.per) && taper.withdraw.per >= taper.withdraw.lose);
   });
 
   for (const scheme of ['incomeTax', 'nationalInsurance']) {
@@ -52,7 +53,12 @@ for (const [id, year] of ALL_YEARS) {
       for (const band of bands) {
         assert.ok(band.id, 'every band needs an id');
         assert.ok(band.label, `band ${band.id} needs a label`);
-        assert.ok(band.rate >= 0 && band.rate < 1, `band ${band.id} rate must be a fraction below 1`);
+        assert.ok(
+          Number.isSafeInteger(band.rateBasisPoints) &&
+            band.rateBasisPoints >= 0 &&
+            band.rateBasisPoints < 10_000,
+          `band ${band.id} rate must be integer basis points below 100%`,
+        );
         assert.ok(
           band.upToPence > previousLimit,
           `band ${band.id} limit must exceed the previous one — no gaps, no overlaps`,
@@ -76,12 +82,12 @@ for (const [id, year] of ALL_YEARS) {
     // income tax rate plus the top NI rate plus the allowance taper ever
     // reached 100%, earning more would not increase take-home pay and there
     // would be no unique answer to invert to.
-    const topTaxRate = Math.max(...year.incomeTax.bands.map((b) => b.rate));
-    const topNiRate = Math.max(...year.nationalInsurance.bands.map((b) => b.rate));
-    const taperMultiplier = 1 + year.personalAllowance.taper.lossPerPound;
+    const topTaxBp = Math.max(...year.incomeTax.bands.map((b) => b.rateBasisPoints));
+    const topNiBp = Math.max(...year.nationalInsurance.bands.map((b) => b.rateBasisPoints));
+    const { lose, per } = year.personalAllowance.taper.withdraw;
 
     assert.ok(
-      topTaxRate * taperMultiplier + topNiRate < 1,
+      (topTaxBp * (per + lose)) / per + topNiBp < 10_000,
       'worst-case marginal deduction must stay below 100%',
     );
   });
@@ -92,8 +98,8 @@ for (const [id, year] of ALL_YEARS) {
     const { bands } = year.incomeTax;
     const published = year.publishedBands;
     const allowance = year.personalAllowance.amountPence;
-    const { thresholdPence, lossPerPound } = year.personalAllowance.taper;
-    const allowanceGoneAtPence = thresholdPence + allowance / lossPerPound;
+    const { thresholdPence, withdraw } = year.personalAllowance.taper;
+    const allowanceGoneAtPence = thresholdPence + (allowance * withdraw.per) / withdraw.lose;
 
     assert.deepEqual(
       published.map((b) => b.id),
@@ -162,27 +168,27 @@ test('2026-27 matches the figures published by gov.scot and gov.uk', () => {
   );
 
   assert.deepEqual(
-    year.incomeTax.bands.map((band) => [band.id, band.rate]),
+    year.incomeTax.bands.map((band) => [band.id, band.rateBasisPoints]),
     [
-      ['starter', 0.19],
-      ['basic', 0.2],
-      ['intermediate', 0.21],
-      ['higher', 0.42],
-      ['advanced', 0.45],
-      ['top', 0.48],
+      ['starter', 1900],
+      ['basic', 2000],
+      ['intermediate', 2100],
+      ['higher', 4200],
+      ['advanced', 4500],
+      ['top', 4800],
     ],
   );
 
   assert.deepEqual(
     year.nationalInsurance.bands.map((band) => [
       band.id,
-      band.rate,
+      band.rateBasisPoints,
       band.upToPence === Infinity ? null : pounds(band.upToPence),
     ]),
     [
       ['below-pt', 0, 12_570],
-      ['main', 0.08, 50_270],
-      ['upper', 0.02, null],
+      ['main', 800, 50_270],
+      ['upper', 200, null],
     ],
   );
 });
@@ -193,7 +199,8 @@ test('the allowance taper reaches zero exactly where the top rate begins', () =>
   // than patching.
   const year = getTaxYear('2026-27');
   const { amountPence, taper } = year.personalAllowance;
-  const allowanceGoneAt = taper.thresholdPence + amountPence / taper.lossPerPound;
+  const allowanceGoneAt =
+    taper.thresholdPence + (amountPence * taper.withdraw.per) / taper.withdraw.lose;
 
   assert.equal(allowanceGoneAt, 12_514_000, 'the allowance is exhausted at £125,140');
   assert.equal(
