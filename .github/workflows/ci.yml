@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  # Callable so the release workflow can gate on exactly the same checks.
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  # github.workflow differs when called from another workflow, so a release's
+  # CI run never cancels a push's CI run for the same ref.
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          # Deliberately no `cache: npm` — this project has no dependencies and
+          # no lockfile, so there is nothing to install or cache. See CLAUDE.md.
+
+      - name: Run tests
+        # Glob rather than a bare `test/` directory: Node 26 no longer accepts
+        # a directory argument here and tries to load it as a module.
+        run: node --test --test-reporter=spec "test/**/*.test.js"
+
+      - name: Guard against personal information in published files
+        run: |
+          # Everything under src/ is served publicly. This is a safety net for
+          # the never-commit rules in CLAUDE.md, not a substitute for care.
+          if grep -rInE '[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z]{2,}' src/; then
+            echo "::error::Email-shaped string found under src/ — see the never-commit rules in CLAUDE.md"
+            exit 1
+          fi
+          echo "No email-shaped strings under src/"
+
+      - name: Guard against runtime dependencies
+        run: |
+          # The site must load nothing from the network. Catch the obvious ways
+          # that constraint gets broken.
+          if grep -rInE 'https?://[^"'"'"' )]*\.(js|css)|<script[^>]+src="https?:|@import[[:space:]]+url\([[:space:]]*["'"'"']?https?:' src/; then
+            echo "::error::src/ appears to reference a remote asset — the site must be fully self-contained. See CLAUDE.md"
+            exit 1
+          fi
+          if [ -d node_modules ] || [ -f package-lock.json ]; then
+            echo "::error::This project has no dependencies by design. See CLAUDE.md"
+            exit 1
+          fi
+          echo "No remote assets or dependencies"
