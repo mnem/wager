@@ -51,7 +51,11 @@ jobs:
         run: |
           # The site must load nothing from the network. Catch the obvious ways
           # that constraint gets broken.
-          if grep -rInE 'https?://[^"'"'"' )]*\.(js|css)|<script[^>]+src="https?:|@import[[:space:]]+url\([[:space:]]*["'"'"']?https?:' src/; then
+          #
+          # The trailing (non-alphanumeric|end) after the extension matters: the
+          # UI links to gov.uk and gov.scot sources, and without it a URL ending
+          # .json would match on its ".js" and fail the build.
+          if grep -rInE 'https?://[^"'"'"' )]*\.(js|css)([^A-Za-z0-9]|$)|<script[^>]+src="https?:|@import[[:space:]]+url\([[:space:]]*["'"'"']?https?:' src/; then
             echo "::error::src/ appears to reference a remote asset — the site must be fully self-contained. See CLAUDE.md"
             exit 1
           fi
