@@ -1,0 +1,13 @@
+{
+  "name": "wager",
+  "private": true,
+  "type": "module",
+  "description": "Static net-to-gross salary estimator for Scottish taxpayers. Exists only to make src/ ES modules; has no dependencies by design — see CLAUDE.md.",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
