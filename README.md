@@ -47,7 +47,7 @@ python3 -m http.server -d src 8000
 Run the tests (Node 20+, nothing to install):
 
 ```bash
-node --test test/
+npm test
 ```
 
 Contribution rules, the release process and the project's hard constraints are in

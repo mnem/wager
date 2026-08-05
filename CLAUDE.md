@@ -89,11 +89,14 @@ config; do not weaken those assertions.
 ## Testing
 
 ```bash
-node --test test/
+npm test        # or: node --test "test/**/*.test.js"
 ```
 
 Zero dependencies — Node's built-in test runner and `node:assert/strict`. Runs
 locally and in CI identically. Requires Node 20+.
+
+Pass a glob, not a bare `test/` directory: Node 26 no longer accepts a directory
+argument to `--test` and tries to load it as a module.
 
 The load-bearing test is the round-trip property in `test/roundtrip.test.js`:
 for a sweep of gross values, compute the net, invert it, and assert the result is
