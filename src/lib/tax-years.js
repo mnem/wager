@@ -19,6 +19,12 @@
  *
  * National Insurance ignores the personal allowance entirely, so its bands are
  * cumulative limits on GROSS income.
+ *
+ * ## Rates are integer basis points
+ *
+ * `rateBasisPoints: 1900` means 19%. Rates are stored this way, and the taper
+ * as a whole-number ratio, so that no step of the calculation involves binary
+ * floating point — 0.21 is not exactly representable, 2100 is.
  */
 
 /** Cumulative band limits use this for "and everything above". */
@@ -47,26 +53,28 @@ export const TAX_YEARS = {
       // £12,570
       amountPence: 1_257_000,
       // Reduced by £1 for every £2 of income over £100,000, so it reaches zero
-      // at £125,140 — which is exactly where the top rate begins.
+      // at £125,140 — which is exactly where the top rate begins. Expressed as
+      // a whole-number ratio rather than 0.5 so the taper stays exact integer
+      // arithmetic.
       taper: {
         thresholdPence: 10_000_000,
-        lossPerPound: 0.5,
+        withdraw: { lose: 1, per: 2 },
       },
     },
 
     incomeTax: {
       appliesTo: 'taxable',
       bands: [
-        { id: 'starter', label: 'Starter rate', rate: 0.19, upToPence: 396_700 },
-        { id: 'basic', label: 'Basic rate', rate: 0.2, upToPence: 1_695_600 },
-        { id: 'intermediate', label: 'Intermediate rate', rate: 0.21, upToPence: 3_109_200 },
-        { id: 'higher', label: 'Higher rate', rate: 0.42, upToPence: 6_243_000 },
+        { id: 'starter', label: 'Starter rate', rateBasisPoints: 1900, upToPence: 396_700 },
+        { id: 'basic', label: 'Basic rate', rateBasisPoints: 2000, upToPence: 1_695_600 },
+        { id: 'intermediate', label: 'Intermediate rate', rateBasisPoints: 2100, upToPence: 3_109_200 },
+        { id: 'higher', label: 'Higher rate', rateBasisPoints: 4200, upToPence: 6_243_000 },
         // £125,140 of taxable income, NOT £112,570. By this point the personal
         // allowance has tapered fully away, so taxable income equals gross
         // income. Using £112,570 here would silently push people into the 48%
         // band from about £112.5k of gross.
-        { id: 'advanced', label: 'Advanced rate', rate: 0.45, upToPence: 12_514_000 },
-        { id: 'top', label: 'Top rate', rate: 0.48, upToPence: NO_UPPER_LIMIT },
+        { id: 'advanced', label: 'Advanced rate', rateBasisPoints: 4500, upToPence: 12_514_000 },
+        { id: 'top', label: 'Top rate', rateBasisPoints: 4800, upToPence: NO_UPPER_LIMIT },
       ],
     },
 
@@ -75,10 +83,10 @@ export const TAX_YEARS = {
       appliesTo: 'gross',
       bands: [
         // Below the primary threshold of £12,570.
-        { id: 'below-pt', label: 'Below primary threshold', rate: 0, upToPence: 1_257_000 },
+        { id: 'below-pt', label: 'Below primary threshold', rateBasisPoints: 0, upToPence: 1_257_000 },
         // Primary threshold to the upper earnings limit of £50,270.
-        { id: 'main', label: 'Main rate', rate: 0.08, upToPence: 5_027_000 },
-        { id: 'upper', label: 'Above upper earnings limit', rate: 0.02, upToPence: NO_UPPER_LIMIT },
+        { id: 'main', label: 'Main rate', rateBasisPoints: 800, upToPence: 5_027_000 },
+        { id: 'upper', label: 'Above upper earnings limit', rateBasisPoints: 200, upToPence: NO_UPPER_LIMIT },
       ],
     },
 
