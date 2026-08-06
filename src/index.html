@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Wager — what salary do I need to take home £X a month?</title>
+    <meta
+      name="description"
+      content="Work backwards from a monthly take-home wage to the gross annual salary that produces it, using Scottish income tax bands and UK National Insurance."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="stylesheet" href="./styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>%C2%A3</text></svg>"
+    />
+  </head>
+  <body>
+    <a class="skip-link" href="#result">Skip to result</a>
+
+    <header class="masthead">
+      <h1>Wager</h1>
+      <p class="tagline">
+        You know what you want to take home. This works out the salary you need to ask for.
+      </p>
+    </header>
+
+    <main>
+      <p class="notice notice--estimate" role="note">
+        <strong>This is an estimate.</strong> It uses
+        <strong>Scottish income tax bands</strong> and UK-wide employee National Insurance, and
+        deliberately ignores pensions, student loans and anything unusual about your tax code.
+        Don't rely on it for anything that matters without checking the figures yourself.
+      </p>
+
+      <form id="calculator" novalidate>
+        <div class="field">
+          <label for="monthly-net">What do you want to take home each month?</label>
+          <div class="input-wrap">
+            <span class="prefix" aria-hidden="true">£</span>
+            <input
+              id="monthly-net"
+              name="monthly-net"
+              type="text"
+              inputmode="decimal"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="2,500"
+              aria-describedby="monthly-net-help monthly-net-error"
+            />
+          </div>
+          <p class="help" id="monthly-net-help">After income tax and National Insurance.</p>
+          <p class="error" id="monthly-net-error" role="alert" hidden></p>
+        </div>
+      </form>
+
+      <section id="result" class="result" aria-live="polite" hidden>
+        <p class="result__label">You'd need a gross salary of about</p>
+        <p class="result__headline" id="headline-gross"></p>
+        <p class="result__sub" id="headline-sub"></p>
+      </section>
+
+      <section class="breakdown" id="breakdown" hidden>
+        <h2>Where the money goes</h2>
+        <p class="breakdown__intro" id="breakdown-intro"></p>
+
+        <div class="tables">
+          <figure class="table-card">
+            <figcaption>Per year</figcaption>
+            <table id="table-annual">
+              <thead>
+                <tr>
+                  <th scope="col">Item</th>
+                  <th scope="col" class="numeric">Amount</th>
+                  <th scope="col" class="numeric">Rate</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </figure>
+
+          <figure class="table-card">
+            <figcaption>Per month</figcaption>
+            <table id="table-monthly">
+              <thead>
+                <tr>
+                  <th scope="col">Item</th>
+                  <th scope="col" class="numeric">Amount</th>
+                  <th scope="col" class="numeric">Rate</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </figure>
+        </div>
+
+        <dl class="rates">
+          <div>
+            <dt>Effective deduction rate</dt>
+            <dd id="effective-rate"></dd>
+          </div>
+          <div>
+            <dt>Marginal rate on the next pound</dt>
+            <dd id="marginal-rate"></dd>
+          </div>
+        </dl>
+        <p class="rates__note" id="marginal-note" hidden></p>
+      </section>
+
+      <section class="bands" id="bands" hidden>
+        <h2>Scottish income tax bands, <span id="bands-year"></span></h2>
+        <table id="table-bands">
+          <thead>
+            <tr>
+              <th scope="col">Band</th>
+              <th scope="col">Gross income</th>
+              <th scope="col" class="numeric">Rate</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <p class="bands__note" id="ni-note"></p>
+      </section>
+
+      <section class="assumptions">
+        <h2>What this does and doesn't include</h2>
+        <p>The calculation covers Scottish income tax and employee National Insurance only.</p>
+        <p><strong>It does not account for:</strong></p>
+        <ul>
+          <li>pension contributions or salary sacrifice</li>
+          <li>student or postgraduate loan repayments</li>
+          <li>benefits in kind, company cars or medical cover</li>
+          <li>any tax code other than the standard one</li>
+          <li>the marriage allowance or blind person's allowance</li>
+          <li>
+            savings and dividend income, which is taxed at UK-wide rates even for Scottish
+            taxpayers
+          </li>
+        </ul>
+        <p><strong>Also worth knowing:</strong></p>
+        <ul>
+          <li>
+            Scottish rates apply to earned income if your main home is in Scotland. If it isn't,
+            these figures don't apply to you.
+          </li>
+          <li>
+            National Insurance is worked out annually here, but real payroll calculates it
+            separately for each pay period. A real payslip may differ slightly.
+          </li>
+          <li>
+            The salary shown is rounded up to the nearest pound, so it always clears the take-home
+            figure you asked for rather than falling a penny short.
+          </li>
+        </ul>
+      </section>
+
+      <section class="provenance">
+        <h2>Where the figures come from</h2>
+        <p id="verified-on"></p>
+        <ul id="sources"></ul>
+      </section>
+    </main>
+
+    <footer class="colophon">
+      <p>
+        <a href="https://github.com/mnem/wager">Wager</a> is open source under the MIT licence.
+        No cookies, no analytics, no data leaves your browser — the calculation runs entirely on
+        this page.
+      </p>
+      <p class="build" id="build-info"></p>
+    </footer>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
