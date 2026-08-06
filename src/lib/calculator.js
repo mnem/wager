@@ -97,6 +97,18 @@ export function personalAllowanceFor(grossPence, year) {
 
   const overThreshold = grossPence - taper.thresholdPence;
   const { lose, per } = taper.withdraw;
+
+  // Flooring is deliberate, not incidental. HMRC works the taper in whole
+  // pounds — adjusted net income, the allowance and tax codes are all
+  // whole-pound quantities — so there is no penny-level convention to follow
+  // and this app is already finer-grained than the real system. Flooring
+  // favours the taxpayer by at most a fraction of a penny and never shows up in
+  // the displayed total.
+  //
+  // It does mean the allowance falls in whole-penny steps rather than smoothly,
+  // so on the pennies where it drops, taxable income rises by 2p for 1p of
+  // gross. test/tax-years.test.js asserts the deduction bound against that
+  // discrete worst case rather than the 1.5x average.
   const taperedAwayPence = Math.min(amountPence, Math.floor((overThreshold * lose) / per));
 
   return {
