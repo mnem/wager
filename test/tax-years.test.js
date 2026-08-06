@@ -7,6 +7,7 @@ import {
   getTaxYear,
   listTaxYearIds,
 } from '../src/lib/tax-years.js';
+import { computeAnnual } from '../src/lib/calculator.js';
 
 const ALL_YEARS = Object.entries(TAX_YEARS);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -77,19 +78,62 @@ for (const [id, year] of ALL_YEARS) {
     });
   }
 
-  test(`${id}: total marginal deduction stays below 100%`, () => {
-    // The inversion relies on net(gross) being strictly increasing. If the top
-    // income tax rate plus the top NI rate plus the allowance taper ever
-    // reached 100%, earning more would not increase take-home pay and there
-    // would be no unique answer to invert to.
-    const topTaxBp = Math.max(...year.incomeTax.bands.map((b) => b.rateBasisPoints));
-    const topNiBp = Math.max(...year.nationalInsurance.bands.map((b) => b.rateBasisPoints));
-    const { lose, per } = year.personalAllowance.taper.withdraw;
+  test(`${id}: one more penny of gross never costs more than one penny`, () => {
+    // The property the net-to-gross inversion rests on. Bisection is only valid
+    // while net pay never falls as gross pay rises, which holds exactly when a
+    // penny of gross costs at most a penny of deductions.
+    //
+    // This is asserted directly rather than through a closed-form bound on the
+    // rates, because every simple bound is wrong in one direction or the other:
+    //
+    //   - The AVERAGE taper multiplier (per + lose) / per = 1.5 is too loose.
+    //     personalAllowanceFor floors the taper, so the allowance drops in
+    //     whole-penny steps rather than smoothly; on the pennies where it
+    //     drops, taxable income rises by 2p for 1p of gross, not 1.5p.
+    //
+    //   - Taking the independent maxima of the tax and NI rates is too strict.
+    //     The largest NI rate here is the 8% main rate, but that only applies
+    //     below the upper earnings limit, where the top rate of income tax
+    //     cannot apply. 48% and 8% never coexist, so combining them invents a
+    //     failure that no income can produce.
+    //
+    // Checking the actual function around every rate change avoids having to
+    // encode which rates can coexist, and stays correct if a future year
+    // reshapes the bands entirely.
+    const { amountPence, taper } = year.personalAllowance;
+    const taperEndsAt = taper.thresholdPence + (amountPence * taper.withdraw.per) / taper.withdraw.lose;
 
-    assert.ok(
-      (topTaxBp * (per + lose)) / per + topNiBp < 10_000,
-      'worst-case marginal deduction must stay below 100%',
-    );
+    const rateChanges = new Set([0, amountPence, taper.thresholdPence, taperEndsAt]);
+    for (const band of year.nationalInsurance.bands) {
+      if (Number.isFinite(band.upToPence)) rateChanges.add(band.upToPence);
+    }
+    for (const band of year.incomeTax.bands) {
+      if (!Number.isFinite(band.upToPence)) continue;
+      // Income tax limits are on taxable income; the corresponding gross is the
+      // limit plus whatever allowance survives, which is the full allowance
+      // below the taper and nothing above it.
+      rateChanges.add(band.upToPence + amountPence);
+      rateChanges.add(band.upToPence);
+    }
+
+    const deductionsAt = (grossPence) => computeAnnual(grossPence, year).totalDeductionsPence;
+
+    for (const point of rateChanges) {
+      for (let gross = Math.max(0, point - 300); gross <= point + 300; gross += 1) {
+        const cost = deductionsAt(gross + 1) - deductionsAt(gross);
+        assert.ok(
+          cost >= 0 && cost <= 1,
+          `at gross ${gross} one more penny cost ${cost}p in deductions`,
+        );
+      }
+    }
+
+    // Sweep the taper as well, since that is where the multiplier is worst and
+    // the effect is spread across the whole range rather than at a boundary.
+    for (let gross = taper.thresholdPence; gross <= taperEndsAt; gross += 1_013) {
+      const cost = deductionsAt(gross + 1) - deductionsAt(gross);
+      assert.ok(cost >= 0 && cost <= 1, `in the taper at gross ${gross} one more penny cost ${cost}p`);
+    }
   });
 
   test(`${id}: published gross bands agree with the taxable bands`, () => {
