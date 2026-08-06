@@ -156,11 +156,15 @@ function renderTaxYearInfo() {
 
   const byId = Object.fromEntries(YEAR.incomeTax.bands.map((band) => [band.id, band]));
   el.bandsBody.replaceChildren();
-  for (const published of YEAR.publishedBands) {
+  YEAR.publishedBands.forEach((published, index) => {
     const band = byId[published.id];
+    // The unbounded band is phrased against where the previous one ended, so it
+    // reads "Over £125,140" exactly as gov.scot writes it, rather than
+    // "Over £125,141" — the same boundary, but not the published wording.
+    const previous = YEAR.publishedBands[index - 1];
     const range =
       published.toPence === null
-        ? `Over ${formatGBP(published.fromPence, { decimals: 0 })}`
+        ? `Over ${formatGBP(previous.toPence, { decimals: 0 })}`
         : `${formatGBP(published.fromPence, { decimals: 0 })} – ${formatGBP(published.toPence, { decimals: 0 })}`;
     // Config bands carry integer basis points; only calculated rows carry a rate.
     addRow(el.bandsBody, {
@@ -168,7 +172,7 @@ function renderTaxYearInfo() {
       amount: range,
       rate: formatPercent(basisPointsToRate(band.rateBasisPoints)),
     });
-  }
+  });
   // The band table's middle column is a range, not a number.
   for (const cell of el.bandsBody.querySelectorAll('td.numeric:first-of-type')) {
     cell.classList.remove('numeric');
