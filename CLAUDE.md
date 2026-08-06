@@ -27,10 +27,11 @@ These are not preferences. Breaking any of them breaks the project.
    no CSS preprocessor.
 3. **No runtime dependencies.** No CDN scripts, no npm packages shipped to the
    browser, no web fonts, no analytics, no network requests of any kind at runtime.
-4. **No dev dependencies either.** `package.json` exists solely to set
-   `"type": "module"` so the same `.js` files work as ES modules in both the browser
-   and Node's test runner. It has no `dependencies`, no `devDependencies`, and there
-   is no lockfile. CI must never need `npm install`.
+4. **No dev dependencies either.** `package.json` exists only to set
+   `"type": "module"` — so the same `.js` files work as ES modules in both the
+   browser and Node's test runner — and to name the test command. It has no
+   `dependencies`, no `devDependencies`, and there is no lockfile. CI must never
+   need `npm install`.
 5. **Everything in `src/` is published publicly.** Never put anything there that
    isn't meant to be on the open internet.
 
@@ -143,7 +144,7 @@ events.
 
 | File | Trigger | Does |
 |---|---|---|
-| `ci.yml` | PR + push to `main`, `workflow_call` | Runs the test suite and the no-personal-info guard |
+| `ci.yml` | every PR, push to `main`, `workflow_call` | Runs the test suite, the no-personal-info guard and the no-runtime-dependencies guard |
 | `deploy.yml` | push to `main`, manual, `workflow_call` | Stages `src/` → `_site/`, generates `version.js`, deploys to Pages |
 | `release.yml` | manual (`workflow_dispatch`) only | Runs CI, tags, generates notes from commit subjects, creates the release, then deploys the tag |
 | `claude.yml` | `@claude` mentions on issues/PRs | Runs the Claude review |
