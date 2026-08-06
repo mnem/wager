@@ -128,11 +128,29 @@ for (const [id, year] of ALL_YEARS) {
       }
     }
 
-    // Sweep the taper as well, since that is where the multiplier is worst and
-    // the effect is spread across the whole range rather than at a boundary.
-    for (let gross = taper.thresholdPence; gross <= taperEndsAt; gross += 1_013) {
-      const cost = deductionsAt(gross + 1) - deductionsAt(gross);
-      assert.ok(cost >= 0 && cost <= 1, `in the taper at gross ${gross} one more penny cost ${cost}p`);
+    // The taper is swept exhaustively rather than sampled.
+    //
+    // Review raised this: a stride is a spot check, not a proof. The pennies
+    // that violate the property are those where the running charge crosses a
+    // rounding boundary, and how often that happens depends on the rates. For
+    // some future rate the pattern could repeat with a period longer than the
+    // number of samples a fixed stride can take across a bounded range, so the
+    // one bad penny could sit between two samples.
+    //
+    // The taper is finite — 2,514,000 pennies for this config — so there is no
+    // need to sample it at all. Checking every penny costs a few seconds and
+    // turns the strongest guarantee in the suite from "probably" into "always".
+    // Walk once carrying the previous value, so it is one calculation per penny
+    // rather than two.
+    let previousDeductions = deductionsAt(taper.thresholdPence);
+    for (let gross = taper.thresholdPence + 1; gross <= taperEndsAt; gross += 1) {
+      const deductions = deductionsAt(gross);
+      const cost = deductions - previousDeductions;
+      assert.ok(
+        cost >= 0 && cost <= 1,
+        `in the taper, going from gross ${gross - 1} to ${gross} cost ${cost}p in deductions`,
+      );
+      previousDeductions = deductions;
     }
   });
 
