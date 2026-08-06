@@ -76,7 +76,21 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Rejects leading zeros, which SemVer disallows.
+          SEMVER='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.]+)?$'
+
           LAST_TAG="$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
+
+          # Validate the previous tag BEFORE decomposing it. A two-component tag
+          # like v1.2 would otherwise decompose to PATCH="2" — the parameter
+          # expansion returns the string unchanged when there is no separator to
+          # strip — and a patch bump would silently produce v1.2.3 rather than
+          # v1.2.1. The shape check on the result cannot catch that, because
+          # v1.2.3 is perfectly well formed. Fail loudly here instead.
+          if [ -n "$LAST_TAG" ] && ! printf '%s' "${LAST_TAG#v}" | grep -Eq "$SEMVER"; then
+            echo "::error::Previous tag ${LAST_TAG} is not a three-component version, so it cannot be bumped from. Pass an explicit version instead."
+            exit 1
+          fi
 
           if [ -n "$REQUESTED_VERSION" ]; then
             VERSION="${REQUESTED_VERSION#v}"
@@ -98,7 +112,7 @@ jobs:
             VERSION="${MAJOR}.${MINOR}.${PATCH}"
           fi
 
-          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+          if ! printf '%s' "$VERSION" | grep -Eq "$SEMVER"; then
             echo "::error::Not a valid version: $VERSION"
             exit 1
           fi
