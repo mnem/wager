@@ -1,8 +1,11 @@
 name: CI
 
 on:
+  # Every pull request, whatever it targets. Filtering on `branches: [main]`
+  # matches the BASE branch, so a stacked pull request — one based on another
+  # feature branch rather than main — would get no CI signal at all until it
+  # was retargeted. Tests are cheap; run them on everything.
   pull_request:
-    branches: [main]
   push:
     branches: [main]
   # Callable so the release workflow can gate on exactly the same checks.
