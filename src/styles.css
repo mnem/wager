@@ -1,0 +1,395 @@
+/*
+ * No web fonts, no external assets, no preprocessor. See CLAUDE.md.
+ */
+
+:root {
+  --ink: #16181d;
+  --ink-soft: #4a5160;
+  --ink-faint: #6b7280;
+  --paper: #fbfbfa;
+  --card: #ffffff;
+  --line: #e2e4e9;
+  --accent: #0b5c4a;
+  --accent-soft: #e6f2ee;
+  --warn-bg: #fff8e6;
+  --warn-line: #e8d5a3;
+  --warn-ink: #6b4f13;
+  --deduction: #96331f;
+
+  --radius: 10px;
+  --measure: 44rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #e8eaef;
+    --ink-soft: #a9b1c1;
+    --ink-faint: #8b93a3;
+    --paper: #14161a;
+    --card: #1c1f25;
+    --line: #2e333c;
+    --accent: #5fd3b2;
+    --accent-soft: #16302a;
+    --warn-bg: #2b2412;
+    --warn-line: #574823;
+    --warn-ink: #e8cf95;
+    --deduction: #f0a08c;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0 1.25rem 4rem;
+  background: var(--paper);
+  color: var(--ink);
+  font: 16px/1.6 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+main,
+.masthead,
+.colophon {
+  max-width: var(--measure);
+  margin-inline: auto;
+}
+
+h1,
+h2 {
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+
+h2 {
+  font-size: 1.15rem;
+  margin: 2.5rem 0 0.75rem;
+}
+
+a {
+  color: var(--accent);
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+}
+.skip-link:focus {
+  left: 1rem;
+  top: 1rem;
+  z-index: 10;
+  padding: 0.5rem 0.75rem;
+  background: var(--card);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+}
+
+/* Header ------------------------------------------------------------------ */
+
+.masthead {
+  padding: 3rem 0 0.5rem;
+}
+
+.masthead h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.tagline {
+  margin: 0.35rem 0 0;
+  color: var(--ink-soft);
+  font-size: 1.05rem;
+  max-width: 32rem;
+}
+
+/* Notices ----------------------------------------------------------------- */
+
+.notice {
+  margin: 1.75rem 0;
+  padding: 0.9rem 1.1rem;
+  border-radius: var(--radius);
+  font-size: 0.94rem;
+}
+
+.notice--estimate {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-line);
+  color: var(--warn-ink);
+}
+
+/* Input ------------------------------------------------------------------- */
+
+.field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.input-wrap {
+  display: flex;
+  align-items: stretch;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  max-width: 20rem;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.input-wrap:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.prefix {
+  display: flex;
+  align-items: center;
+  padding-inline: 0.85rem 0.2rem;
+  color: var(--ink-faint);
+  font-size: 1.35rem;
+}
+
+#monthly-net {
+  flex: 1;
+  min-width: 0;
+  padding: 0.7rem 0.85rem 0.7rem 0.15rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 1.35rem;
+  font-variant-numeric: tabular-nums;
+}
+
+#monthly-net:focus {
+  outline: none;
+}
+
+.help {
+  margin: 0.45rem 0 0;
+  color: var(--ink-faint);
+  font-size: 0.87rem;
+}
+
+.error {
+  margin: 0.45rem 0 0;
+  color: var(--deduction);
+  font-size: 0.87rem;
+  font-weight: 600;
+}
+
+/* Result ------------------------------------------------------------------ */
+
+.result {
+  margin: 2.25rem 0 0;
+  padding: 1.5rem 1.6rem;
+  background: var(--accent-soft);
+  border-radius: var(--radius);
+}
+
+.result__label {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.94rem;
+}
+
+.result__headline {
+  margin: 0.2rem 0 0;
+  font-size: clamp(2.1rem, 8vw, 3rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.result__sub {
+  margin: 0.35rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.94rem;
+}
+
+/* Tables ------------------------------------------------------------------ */
+
+.breakdown__intro {
+  margin-top: 0;
+  color: var(--ink-soft);
+  font-size: 0.94rem;
+}
+
+.tables {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 46rem) {
+  .tables {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.table-card {
+  margin: 0;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow-x: auto;
+}
+
+.table-card figcaption {
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--line);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+th,
+td {
+  padding: 0.45rem 1rem;
+  text-align: left;
+}
+
+thead th {
+  color: var(--ink-faint);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  padding-block: 0.6rem;
+}
+
+.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+tbody tr.is-band th {
+  font-weight: 400;
+  padding-left: 2rem;
+  color: var(--ink-soft);
+}
+
+tbody tr.is-deduction td.numeric:first-of-type {
+  color: var(--deduction);
+}
+
+tbody tr.is-subtotal th,
+tbody tr.is-subtotal td {
+  font-weight: 600;
+  border-top: 1px solid var(--line);
+}
+
+tbody tr.is-total th,
+tbody tr.is-total td {
+  font-weight: 700;
+  border-top: 2px solid var(--line);
+  font-size: 0.98rem;
+}
+
+tbody tr.is-total td.numeric:first-of-type {
+  color: var(--accent);
+}
+
+/* Rates ------------------------------------------------------------------- */
+
+.rates {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  margin: 1.25rem 0 0;
+}
+
+.rates > div {
+  padding: 0.85rem 1rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.rates dt {
+  color: var(--ink-faint);
+  font-size: 0.82rem;
+}
+
+.rates dd {
+  margin: 0.15rem 0 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.rates__note {
+  margin: 0.75rem 0 0;
+  padding: 0.75rem 1rem;
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-line);
+  color: var(--warn-ink);
+  border-radius: var(--radius);
+  font-size: 0.88rem;
+}
+
+/* Bands, assumptions, provenance ------------------------------------------ */
+
+.bands table {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.bands__note,
+.provenance p {
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+}
+
+.assumptions,
+.provenance {
+  color: var(--ink-soft);
+  font-size: 0.94rem;
+}
+
+.assumptions ul,
+.provenance ul {
+  padding-left: 1.2rem;
+}
+
+.assumptions li,
+.provenance li {
+  margin-bottom: 0.3rem;
+}
+
+/* Footer ------------------------------------------------------------------ */
+
+.colophon {
+  margin-top: 3.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+  color: var(--ink-faint);
+  font-size: 0.85rem;
+}
+
+.build {
+  font-variant-numeric: tabular-nums;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
