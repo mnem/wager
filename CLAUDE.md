@@ -17,6 +17,18 @@ Insurance**, and presents a full breakdown both per month and per year. It is an
 
 The site is deployed to GitHub Pages from this repository.
 
+## Read these first
+
+This file is the **rules**. Two companion documents cover the *why* and the *how*:
+
+- [`docs/architecture.md`](docs/architecture.md) — how the system fits together
+  and the five decisions that shape it. Read before changing anything in
+  `src/lib/`.
+- [`docs/updating-tax-rates.md`](docs/updating-tax-rates.md) — the procedure for
+  changing a tax figure or adding a tax year, including the gross-versus-taxable
+  trap that silently over-taxes people. Read before touching
+  `src/lib/tax-years.js`.
+
 ## Hard constraints
 
 These are not preferences. Breaking any of them breaks the project.
@@ -171,6 +183,8 @@ The release job commits as `github-actions[bot]` — never a human identity.
 ## Layout
 
 ```
+docs/architecture.md    how it fits together, and why
+docs/updating-tax-rates.md  procedure for changing tax figures
 src/index.html          the whole UI
 src/styles.css
 src/app.js              DOM wiring only, no arithmetic

@@ -50,8 +50,18 @@ Run the tests (Node 20+, nothing to install):
 npm test
 ```
 
-Contribution rules, the release process and the project's hard constraints are in
-[CLAUDE.md](CLAUDE.md).
+## Documentation
+
+| | |
+|---|---|
+| [CLAUDE.md](CLAUDE.md) | The rules: hard constraints, code standards, commit and release process |
+| [docs/architecture.md](docs/architecture.md) | How it fits together, and the reasoning behind each design decision |
+| [docs/updating-tax-rates.md](docs/updating-tax-rates.md) | How to change a tax figure or add a tax year, and how to verify you got it right |
+
+**If you are here to update the tax rates**, go straight to
+[docs/updating-tax-rates.md](docs/updating-tax-rates.md) — there is one
+conversion that is easy to get wrong and silently over-taxes anyone earning
+over about £112,500.
 
 ## Licence
 
