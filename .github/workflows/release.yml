@@ -1,0 +1,188 @@
+name: Release
+
+# Manual only. Run from the Actions tab.
+#
+# Runs the full test suite, tags, generates notes from commit subjects, creates
+# the release, then deploys that exact tag to Pages so the footer version
+# matches the release.
+#
+# The deploy is a workflow_call, NOT `on: release: [published]` in deploy.yml.
+# Releases created with GITHUB_TOKEN do not trigger further workflows, so that
+# deploy would never fire. See CLAUDE.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Explicit version, e.g. 1.2.0. Leave blank to bump the last tag.'
+        type: string
+        required: false
+        default: ''
+      bump:
+        description: 'Which part to bump, when version is left blank'
+        type: choice
+        options: [patch, minor, major]
+        default: minor
+      prerelease:
+        description: 'Mark the release as a prerelease'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  # Two releases at once would race on the tag.
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # A red build is never tagged.
+  test:
+    name: test
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: tag and release
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      # Needed to push the tag and create the release.
+      contents: write
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Refuse to release from anywhere but main
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          if [ "$REF" != "refs/heads/main" ]; then
+            echo "::error::Releases must be cut from main, got $REF"
+            exit 1
+          fi
+
+      - name: Work out the version
+        id: version
+        env:
+          # Passed through the environment rather than interpolated into the
+          # script, so a crafted input cannot inject shell.
+          REQUESTED_VERSION: ${{ inputs.version }}
+          BUMP: ${{ inputs.bump }}
+        run: |
+          set -euo pipefail
+
+          LAST_TAG="$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
+
+          if [ -n "$REQUESTED_VERSION" ]; then
+            VERSION="${REQUESTED_VERSION#v}"
+          elif [ -z "$LAST_TAG" ]; then
+            VERSION="0.1.0"
+          else
+            BASE="${LAST_TAG#v}"
+            MAJOR="${BASE%%.*}"
+            REST="${BASE#*.}"
+            MINOR="${REST%%.*}"
+            PATCH="${REST#*.}"
+            PATCH="${PATCH%%-*}"
+            case "$BUMP" in
+              major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+              minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+              patch) PATCH=$((PATCH + 1)) ;;
+              *) echo "::error::Unknown bump: $BUMP"; exit 1 ;;
+            esac
+            VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          fi
+
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+            echo "::error::Not a valid version: $VERSION"
+            exit 1
+          fi
+
+          TAG="v${VERSION}"
+
+          # Refuse to reuse a tag, locally or on the remote. Moving a released
+          # tag would leave the deployed footer pointing at the wrong code.
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "::error::Tag ${TAG} already exists"
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "::error::Tag ${TAG} already exists on the remote"
+            exit 1
+          fi
+
+          {
+            echo "tag=${TAG}"
+            echo "version=${VERSION}"
+            echo "last_tag=${LAST_TAG}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Releasing ${TAG}${LAST_TAG:+ (previous: ${LAST_TAG})}"
+
+      - name: Compose the release notes
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          LAST_TAG: ${{ steps.version.outputs.last_tag }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # The notes ARE the commit subjects — which is why CLAUDE.md requires
+          # Conventional Commits and treats the subject line as the changelog
+          # entry rather than a note to self.
+          if [ -n "$LAST_TAG" ]; then
+            RANGE="${LAST_TAG}..HEAD"
+          else
+            RANGE="HEAD"
+          fi
+
+          {
+            echo "## What changed"
+            echo
+            git log "$RANGE" --no-merges --pretty='- %s (%h)'
+            echo
+            if [ -n "$LAST_TAG" ]; then
+              echo "**Full changelog**: https://github.com/${REPO}/compare/${LAST_TAG}...${TAG}"
+            fi
+          } > notes.md
+
+          cat notes.md
+
+      - name: Tag and create the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          set -euo pipefail
+
+          # Committed by the bot, never a human identity. See CLAUDE.md.
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          git tag -a "$TAG" -m "$TAG"
+          git push origin "refs/tags/${TAG}"
+
+          if [ "$PRERELEASE" = "true" ]; then
+            gh release create "$TAG" --title "$TAG" --notes-file notes.md --prerelease
+          else
+            gh release create "$TAG" --title "$TAG" --notes-file notes.md
+          fi
+
+  # Deploy the tag itself, so the footer version matches the release.
+  deploy:
+    name: deploy the tag
+    needs: release
+    uses: ./.github/workflows/deploy.yml
+    with:
+      ref: ${{ needs.release.outputs.tag }}
+      version: ${{ needs.release.outputs.tag }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
