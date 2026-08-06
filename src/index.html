@@ -26,12 +26,20 @@
     </header>
 
     <main>
-      <p class="notice notice--estimate" role="note">
-        <strong>This is an estimate.</strong> It uses
-        <strong>Scottish income tax bands</strong> and UK-wide employee National Insurance, and
-        deliberately ignores pensions, student loans and anything unusual about your tax code.
-        Don't rely on it for anything that matters without checking the figures yourself.
-      </p>
+      <!-- Collapsed by default, but the summary alone still carries the two
+           things that must always be visible: that this is an estimate, and
+           that it uses Scottish bands. Only the elaboration is hidden. -->
+      <details class="notice notice--estimate">
+        <summary>
+          <strong>This is an estimate</strong>, using <strong>Scottish income tax bands</strong>
+        </summary>
+        <p>
+          It covers Scottish income tax and UK-wide employee National Insurance, and
+          deliberately ignores pensions, student loans and anything unusual about your tax code.
+          Don't rely on it for anything that matters without checking the figures yourself —
+          the sources are linked at the bottom of this page.
+        </p>
+      </details>
 
       <form id="calculator" novalidate>
         <div class="field">
@@ -105,6 +113,43 @@
           </div>
         </dl>
         <p class="rates__note" id="marginal-note" hidden></p>
+
+        <!-- Lives inside the breakdown rather than as a top-level section:
+             the exclusions matter most when you are looking at a figure and
+             deciding whether to trust it. -->
+        <details class="exclusions">
+          <summary>What this doesn't include</summary>
+          <div class="exclusions__body">
+            <p>The calculation covers Scottish income tax and employee National Insurance only.</p>
+            <p><strong>It does not account for:</strong></p>
+            <ul>
+              <li>pension contributions or salary sacrifice</li>
+              <li>student or postgraduate loan repayments</li>
+              <li>benefits in kind, company cars or medical cover</li>
+              <li>any tax code other than the standard one</li>
+              <li>the marriage allowance or blind person's allowance</li>
+              <li>
+                savings and dividend income, which is taxed at UK-wide rates even for Scottish
+                taxpayers
+              </li>
+            </ul>
+            <p><strong>Also worth knowing:</strong></p>
+            <ul>
+              <li>
+                Scottish rates apply to earned income if your main home is in Scotland. If it
+                isn't, these figures don't apply to you.
+              </li>
+              <li>
+                National Insurance is worked out annually here, but real payroll calculates it
+                separately for each pay period. A real payslip may differ slightly.
+              </li>
+              <li>
+                The salary shown is rounded up to the nearest pound, so it always clears the
+                take-home figure you asked for rather than falling a penny short.
+              </li>
+            </ul>
+          </div>
+        </details>
       </section>
 
       <section class="bands" id="bands" hidden>
@@ -120,38 +165,6 @@
           <tbody></tbody>
         </table>
         <p class="bands__note" id="ni-note"></p>
-      </section>
-
-      <section class="assumptions">
-        <h2>What this does and doesn't include</h2>
-        <p>The calculation covers Scottish income tax and employee National Insurance only.</p>
-        <p><strong>It does not account for:</strong></p>
-        <ul>
-          <li>pension contributions or salary sacrifice</li>
-          <li>student or postgraduate loan repayments</li>
-          <li>benefits in kind, company cars or medical cover</li>
-          <li>any tax code other than the standard one</li>
-          <li>the marriage allowance or blind person's allowance</li>
-          <li>
-            savings and dividend income, which is taxed at UK-wide rates even for Scottish
-            taxpayers
-          </li>
-        </ul>
-        <p><strong>Also worth knowing:</strong></p>
-        <ul>
-          <li>
-            Scottish rates apply to earned income if your main home is in Scotland. If it isn't,
-            these figures don't apply to you.
-          </li>
-          <li>
-            National Insurance is worked out annually here, but real payroll calculates it
-            separately for each pay period. A real payslip may differ slightly.
-          </li>
-          <li>
-            The salary shown is rounded up to the nearest pound, so it always clears the take-home
-            figure you asked for rather than falling a penny short.
-          </li>
-        </ul>
       </section>
 
       <section class="provenance">

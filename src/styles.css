@@ -120,6 +120,53 @@ a {
   background: var(--warn-bg);
   border: 1px solid var(--warn-line);
   color: var(--warn-ink);
+  padding: 0;
+}
+
+/* Deliberately not flex: the summary is a sentence, and making its inline
+   parts flex items inserts a gap before the comma. Normal text flow, with
+   room reserved on the right for the chevron. */
+.notice--estimate > summary {
+  padding: 0.8rem 2.5rem 0.8rem 1.1rem;
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+/* Safari still needs the WebKit pseudo-element to drop the default triangle. */
+.notice--estimate > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* A chevron that rotates, rather than the default triangle, so the control
+   reads as part of the notice instead of bolted onto it. */
+.notice--estimate > summary::after {
+  content: '';
+  position: absolute;
+  right: 1.2rem;
+  top: 1.15rem;
+  width: 0.45em;
+  height: 0.45em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+  opacity: 0.7;
+}
+
+.notice--estimate[open] > summary::after {
+  transform: rotate(225deg);
+}
+
+.notice--estimate > summary:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
+  border-radius: var(--radius);
+}
+
+.notice--estimate > p {
+  margin: 0;
+  padding: 0 1.1rem 0.9rem;
 }
 
 /* Input ------------------------------------------------------------------- */
@@ -354,19 +401,84 @@ tbody tr.is-total td.numeric:first-of-type {
   font-size: 0.88rem;
 }
 
-.assumptions,
 .provenance {
   color: var(--ink-soft);
   font-size: 0.94rem;
 }
 
-.assumptions ul,
 .provenance ul {
   padding-left: 1.2rem;
 }
 
-.assumptions li,
 .provenance li {
+  margin-bottom: 0.3rem;
+}
+
+/* Exclusions ---------------------------------------------------------------
+
+   Sits inside the breakdown, so it is styled to read as a footnote to the
+   tables rather than as a section competing with them. */
+
+.exclusions {
+  margin-top: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.exclusions > summary {
+  padding: 0.7rem 2.5rem 0.7rem 1rem;
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.exclusions > summary::-webkit-details-marker {
+  display: none;
+}
+
+.exclusions > summary::after {
+  content: '';
+  position: absolute;
+  right: 1.1rem;
+  top: 1rem;
+  width: 0.45em;
+  height: 0.45em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+  opacity: 0.55;
+}
+
+.exclusions[open] > summary::after {
+  transform: rotate(225deg);
+}
+
+.exclusions > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: var(--radius);
+}
+
+.exclusions__body {
+  padding: 0 1rem 0.9rem;
+  border-top: 1px solid var(--line);
+}
+
+.exclusions__body p:first-child {
+  margin-top: 0.9rem;
+}
+
+.exclusions__body ul {
+  padding-left: 1.2rem;
+}
+
+.exclusions__body li {
   margin-bottom: 0.3rem;
 }
 
