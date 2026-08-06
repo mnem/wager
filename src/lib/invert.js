@@ -22,7 +22,7 @@
  * adds a whole new deduction.
  */
 
-import { assertPence } from './money.js';
+import { assertPence, ceilToPound } from './money.js';
 import { getTaxYear } from './tax-years.js';
 import { computeAnnual, toMonthly } from './calculator.js';
 
@@ -129,6 +129,103 @@ export function grossFromAnnualNet(targetNetPence, year = getTaxYear()) {
 export function grossFromMonthlyNet(monthlyNetPence, year = getTaxYear()) {
   assertPence(monthlyNetPence);
   return grossFromAnnualNet(monthlyNetPence * MONTHS_PER_YEAR, year);
+}
+
+/**
+ * @typedef {object} SalarySuggestion
+ * @property {number} grossPence the salary to quote — a whole number of pounds
+ * @property {number} targetMonthlyNetPence the monthly net that was asked for
+ * @property {number} surplusPence how much more than the target this nets each month
+ * @property {import('./calculator.js').Breakdown} annual
+ * @property {import('./calculator.js').Breakdown} monthly
+ */
+
+/**
+ * How far the whole-pound search may walk from its starting point, in pounds.
+ *
+ * Twelve times a monthly figure differs from the true annual net by at most a
+ * few pence of rounding, so the starting estimate is never more than a pound or
+ * two out. Ten is generous; the bound exists so a future change can never turn
+ * this into an unbounded scan.
+ */
+const MAX_POUND_WALK = 10;
+
+/**
+ * Turn a monthly take-home target into a salary figure fit to quote at someone.
+ *
+ * ## Why this targets the monthly figure directly
+ *
+ * The obvious implementation — multiply by twelve and invert the annual net —
+ * is subtly wrong, and visibly so. A monthly figure is rounded to the penny, so
+ * twelve of them need not equal the annual net: £60,000 takes home £3,633.95 a
+ * month, but twelve of those is £43,607.40, five pence more than the £43,607.35
+ * that salary actually pays. Asking for £3,633.95 a month would then demand
+ * more gross and answer "£60,001" — which is wrong in the way that matters,
+ * because the person asking may well know that £60,000 pays exactly that.
+ *
+ * So the target is the monthly figure itself.
+ *
+ * ## Why the search works in whole pounds
+ *
+ * Monthly net is not monotonic in gross. It is the difference of two separately
+ * rounded figures — monthly gross minus monthly deductions — so it wobbles. At
+ * £45,000 the monthly net is £2,960.30, dips to £2,960.29 for the next five
+ * pence of gross, then recovers. Bisecting on it, or walking down a penny at a
+ * time, stops at the first dip and overshoots the answer by a pound.
+ *
+ * Searching in whole pounds sidesteps this entirely, and is the right
+ * granularity anyway: the answer is a salary to quote at someone, and nobody
+ * negotiates £119,999.99. A pound of gross moves the monthly net by several
+ * pence, comfortably more than the one-penny wobble, so at this granularity the
+ * function is well behaved.
+ *
+ * Bisection on the annual net — which *is* monotonic — gets within a pound or
+ * two cheaply, then a short bounded walk settles it. The result is the smallest
+ * whole-pound salary that takes home at least the requested amount each month.
+ *
+ * @param {number} monthlyNetPence
+ * @param {object} [year]
+ * @returns {SalarySuggestion}
+ */
+export function salaryForMonthlyNet(monthlyNetPence, year = getTaxYear()) {
+  assertPence(monthlyNetPence);
+  if (monthlyNetPence < 0) {
+    throw new RangeError(`Net pay cannot be negative, got ${monthlyNetPence}`);
+  }
+
+  const monthlyNetAt = (grossPence) => toMonthly(computeAnnual(grossPence, year)).netPence;
+  const POUND = 100;
+
+  let grossPence = ceilToPound(grossFromMonthlyNet(monthlyNetPence, year).grossPence);
+  const startedAt = grossPence;
+
+  // Make sure it really is sufficient in monthly terms...
+  while (
+    monthlyNetAt(grossPence) < monthlyNetPence &&
+    grossPence - startedAt < MAX_POUND_WALK * POUND
+  ) {
+    grossPence += POUND;
+  }
+
+  // ...then give back every pound that turns out not to be needed.
+  while (
+    grossPence >= POUND &&
+    startedAt - grossPence < MAX_POUND_WALK * POUND &&
+    monthlyNetAt(grossPence - POUND) >= monthlyNetPence
+  ) {
+    grossPence -= POUND;
+  }
+
+  const annual = computeAnnual(grossPence, year);
+  const monthly = toMonthly(annual);
+
+  return {
+    grossPence,
+    targetMonthlyNetPence: monthlyNetPence,
+    surplusPence: monthly.netPence - monthlyNetPence,
+    annual,
+    monthly,
+  };
 }
 
 /**

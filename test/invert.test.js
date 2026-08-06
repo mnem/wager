@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { grossFromAnnualNet, grossFromMonthlyNet } from '../src/lib/invert.js';
-import { computeAnnual } from '../src/lib/calculator.js';
+import { grossFromAnnualNet, grossFromMonthlyNet, salaryForMonthlyNet } from '../src/lib/invert.js';
+import { computeAnnual, toMonthly } from '../src/lib/calculator.js';
+import { ceilToPound } from '../src/lib/money.js';
 import { getTaxYear } from '../src/lib/tax-years.js';
 
 const YEAR = getTaxYear('2026-27');
@@ -225,4 +226,67 @@ test('gives up rather than looping forever on an impossible tax year', () => {
   ];
 
   assert.throws(() => grossFromAnnualNet(p(1_000), confiscatory), RangeError);
+});
+
+test('salaryForMonthlyNet always quotes a whole number of pounds', () => {
+  for (const monthly of [p(1_000), p(2_500), p(2_960.3), p(3_633.95), p(5_934.3)]) {
+    const suggestion = salaryForMonthlyNet(monthly, YEAR);
+    assert.equal(suggestion.grossPence % 100, 0, `${monthly} should give a whole-pound salary`);
+    assert.equal(suggestion.annual.grossPence, suggestion.grossPence);
+  }
+});
+
+test('the quoted salary is the smallest whole pound that clears the target', () => {
+  // Minimality at pound granularity: one pound less must fall short.
+  const monthlyNetAt = (gross) => toMonthly(computeAnnual(gross, YEAR)).netPence;
+
+  for (let monthly = p(600); monthly <= p(9_000); monthly += 877) {
+    const { grossPence } = salaryForMonthlyNet(monthly, YEAR);
+    assert.ok(monthlyNetAt(grossPence) >= monthly, `${grossPence} must clear ${monthly}`);
+    assert.ok(
+      monthlyNetAt(grossPence - 100) < monthly,
+      `${grossPence} must be the smallest whole pound clearing ${monthly}`,
+    );
+  }
+});
+
+test('the take-home figures a real salary produces map back to that salary', () => {
+  // The test that would have caught targeting the annual net instead of the
+  // monthly one. £60,000 takes home £3,633.95 a month; twelve of those is
+  // £43,607.40, five pence more than the £43,607.35 that salary actually pays.
+  // Multiplying by twelve therefore demanded more gross and answered £60,001.
+  for (const gross of [30_000, 45_000, 60_000, 90_000, 120_000, 150_000]) {
+    const monthlyNet = toMonthly(computeAnnual(p(gross), YEAR)).netPence;
+    const suggestion = salaryForMonthlyNet(monthlyNet, YEAR);
+
+    assert.equal(
+      suggestion.grossPence,
+      p(gross),
+      `£${gross} takes home ${monthlyNet}p a month, which should map back to £${gross}`,
+    );
+    assert.equal(suggestion.monthly.netPence, monthlyNet, 'and produce the same monthly figure');
+  }
+});
+
+test('the quoted salary always clears the requested take-home pay', () => {
+  // Rounding up rather than to nearest is what guarantees this. If it rounded
+  // to nearest, some salaries would come back a penny short of what was asked.
+  for (let monthlyNet = p(400); monthlyNet <= p(15_000); monthlyNet += 613) {
+    const suggestion = salaryForMonthlyNet(monthlyNet, YEAR);
+    assert.ok(
+      suggestion.monthly.netPence >= monthlyNet,
+      `asked for ${monthlyNet} a month, quoted salary only nets ${suggestion.monthly.netPence}`,
+    );
+    assert.ok(suggestion.surplusPence >= 0, 'never short of the annual target');
+    assert.equal(suggestion.grossPence % 100, 0);
+    assert.equal(suggestion.annual.grossPence, suggestion.grossPence, 'breakdown matches the quote');
+  }
+});
+
+test('ceilToPound leaves whole pounds alone', () => {
+  assert.equal(ceilToPound(0), 0);
+  assert.equal(ceilToPound(100), 100);
+  assert.equal(ceilToPound(101), 200);
+  assert.equal(ceilToPound(199), 200);
+  assert.equal(ceilToPound(12_000_000), 12_000_000);
 });

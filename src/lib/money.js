@@ -38,6 +38,17 @@ export function roundHalfUp(numerator, denominator) {
 }
 
 /**
+ * Round up to the next whole pound.
+ *
+ * @param {number} pence
+ * @returns {number} integer pence, a multiple of 100
+ */
+export function ceilToPound(pence) {
+  assertPence(pence);
+  return Math.ceil(pence / PENCE_PER_POUND) * PENCE_PER_POUND;
+}
+
+/**
  * Convert integer basis points to a fraction, for display only.
  *
  * @param {number} basisPoints e.g. 1900
