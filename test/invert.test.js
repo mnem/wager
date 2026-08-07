@@ -172,6 +172,49 @@ test('rejects impossible input', () => {
   assert.throws(() => grossFromMonthlyNet(-1, YEAR), RangeError);
 });
 
+test('finds answers right up to the ceiling', () => {
+  // Review found that doubling the bracket could overshoot MAX_GROSS_PENCE and
+  // give up, rejecting targets that genuinely have an answer just below it.
+  // Every target from just over half the ceiling's output up to its exact
+  // maximum used to throw RangeError.
+  const CEILING = 100_000_000_00;
+  const highestReachable = netAt(CEILING);
+
+  for (const target of [
+    highestReachable - 1_035_505,
+    highestReachable - 1_035_504,
+    highestReachable - 500_000,
+    highestReachable - 1,
+    highestReachable,
+  ]) {
+    const { grossPence } = grossFromAnnualNet(target, YEAR);
+    assert.ok(netAt(grossPence) >= target, `${target} must be reachable`);
+    assert.ok(netAt(grossPence - 1) < target, `${target} must get the minimal gross`);
+    assert.ok(grossPence <= CEILING, 'and must not exceed the ceiling');
+  }
+});
+
+test('rejects unreachable targets clearly, never with an overflow', () => {
+  // The other half of the same review finding: the ceiling was only enforced on
+  // the upper bound, so a large target reached the calculator first, lost
+  // precision past Number.MAX_SAFE_INTEGER, and surfaced as a TypeError from
+  // inside roundHalfUp — the exact confusing failure the ceiling exists to
+  // prevent.
+  const highestReachable = netAt(100_000_000_00);
+
+  for (const target of [highestReachable + 1, 20_000_000_000_00, 900_000_000_000_00]) {
+    assert.throws(
+      () => grossFromAnnualNet(target, YEAR),
+      (error) => {
+        assert.ok(error instanceof RangeError, `expected RangeError, got ${error.constructor.name}`);
+        assert.match(error.message, /the most it can produce is/);
+        return true;
+      },
+      `target ${target} should be rejected cleanly`,
+    );
+  }
+});
+
 test('gives up rather than looping forever on an impossible tax year', () => {
   // A config that deducted everything at the margin would have no answer. The
   // bracket loop must terminate rather than spin or overflow.

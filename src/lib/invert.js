@@ -67,25 +67,39 @@ export function grossFromAnnualNet(targetNetPence, year = getTaxYear()) {
 
   const netAt = (grossPence) => computeAnnual(grossPence, year).netPence;
 
+  // Establish what the ceiling can deliver before doing anything else.
+  //
+  // This has to come first. The obvious lower bound below is the target itself,
+  // so an absurd target would be handed straight to the calculator, where
+  // multiplying pence by basis points silently loses precision past
+  // Number.MAX_SAFE_INTEGER and surfaces as a confusing TypeError from inside
+  // roundHalfUp. Checking the ceiling up front means every later calculation is
+  // provably in range, because gross never needs to exceed the ceiling.
+  const highestReachableNetPence = netAt(MAX_GROSS_PENCE);
+  if (targetNetPence > highestReachableNetPence) {
+    throw new RangeError(
+      `No gross salary up to £${(MAX_GROSS_PENCE / 100).toLocaleString('en-GB')} takes home ` +
+        `£${(targetNetPence / 100).toLocaleString('en-GB')} a year — the most it can produce is ` +
+        `£${(highestReachableNetPence / 100).toLocaleString('en-GB')}.`,
+    );
+  }
+
   // Gross can never be below net, so the target is a valid lower bound.
   let low = targetNetPence;
   if (netAt(low) >= targetNetPence) {
     return describe(low, targetNetPence, 0, year);
   }
 
-  // Grow an upper bound until it is definitely sufficient. The ceiling is
-  // checked before each calculation, not after, so an unreachable target fails
-  // here with a clear message rather than overflowing inside the calculator.
-  let high = Math.max(low * 2, 100_00);
-  for (;;) {
-    if (high > MAX_GROSS_PENCE) {
-      throw new RangeError(
-        `No gross salary up to £${MAX_GROSS_PENCE / 100} nets ${targetNetPence}p. ` +
-          'Either the figure is beyond what this calculator handles, or the tax year config deducts everything at the margin.',
-      );
-    }
-    if (netAt(high) >= targetNetPence) break;
-    high *= 2;
+  // Grow an upper bound until it is sufficient, clamping to the ceiling rather
+  // than giving up when doubling overshoots it. Doubling from just under half
+  // the ceiling lands just over it, and the answer for those targets lies
+  // between the two — bailing out there rejected salaries that genuinely exist.
+  //
+  // The check above guarantees the ceiling itself is sufficient, so stopping at
+  // it always leaves net(high) >= target, and the loop always terminates.
+  let high = Math.min(Math.max(low * 2, 100_00), MAX_GROSS_PENCE);
+  while (high < MAX_GROSS_PENCE && netAt(high) < targetNetPence) {
+    high = Math.min(high * 2, MAX_GROSS_PENCE);
   }
 
   // Invariant: netAt(low) < target <= netAt(high). Narrow until they touch.
