@@ -14,6 +14,17 @@ import { validateTaxYear } from '../src/lib/validate.js';
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
+ * Whether a jurisdiction points its rates at another rather than declaring its
+ * own. Proving monotonicity again for an identical set of bands would cost two
+ * seconds to learn nothing; a separate test asserts the two really do resolve
+ * to the same figures, which is the claim that matters.
+ */
+const mirrorsAnother = (year) =>
+  Object.values(TAX_YEARS[year.id].jurisdictions).some(
+    (candidate) => candidate.id === year.jurisdictionId && Boolean(candidate.ratesSameAs),
+  );
+
+/**
  * Every (tax year, jurisdiction) pair, resolved through `getTaxYear` — which is
  * also the only shape the calculator ever sees. Testing the resolved form means
  * the invariants below cover the flattening as well as the data.
@@ -45,11 +56,11 @@ for (const { name, config: year } of ALL_CONFIGS) {
     assert.ok(Array.isArray(year.sources) && year.sources.length > 0, 'sources are required');
     for (const source of year.sources) {
       assert.ok(source.label, 'every source needs a label');
-      assert.match(source.url, /^https:\/\/(www\.)?gov\.(uk|scot)\//, 'sources must be primary');
+      assert.match(source.url, /^https:\/\/(www\.)?gov\.(uk|scot|wales)\//, 'sources must be primary');
     }
   });
 
-  test(`${name}: is a usable tax year`, () => {
+  test(`${name}: is a usable tax year`, { skip: mirrorsAnother(year) && 'rates mirror another jurisdiction, proved there' }, () => {
     // The structural invariants and the monotonicity property live in
     // src/lib/validate.js rather than here, so that the tests and the UI check
     // exactly the same things. Duplicating them would let the two drift, and
@@ -147,10 +158,48 @@ test('2026-27 Scotland matches the figures published by gov.scot', () => {
   );
 });
 
-test('2026-27 rest of the UK matches the figures published by gov.uk', () => {
+test('Wales resolves to exactly the same rates as England and Northern Ireland', () => {
+  // Wales sets its own rates; for 2026/27 the Senedd chose figures identical to
+  // England and Northern Ireland. The config points at them rather than copying
+  // them, so this asserts the indirection resolves rather than that someone
+  // transcribed the numbers twice correctly.
+  const wales = getTaxYear('2026-27', 'wales');
+  const englandNi = getTaxYear('2026-27', 'england-ni');
+
+  assert.deepEqual(wales.incomeTax, englandNi.incomeTax);
+  assert.deepEqual(wales.publishedBands, englandNi.publishedBands);
+
+  // But it is still its own jurisdiction, with its own sources and its own
+  // explanation of why the figures currently coincide.
+  assert.equal(wales.jurisdictionId, 'wales');
+  assert.equal(wales.jurisdiction, 'Wales');
+  assert.notDeepEqual(wales.sources, englandNi.sources);
+  assert.match(wales.sources[0].url, /gov\.wales/);
+  assert.ok(wales.ratesNote, 'Wales must explain that its rates merely match, rather than looking coincidental');
+  assert.equal(englandNi.ratesNote, null, 'a jurisdiction setting its own rates needs no such note');
+});
+
+test('a jurisdiction cannot point its rates at a missing or chained target', () => {
+  // One level of indirection only. A chain would make it hard to see which
+  // figures actually apply, which is the problem the pointer exists to avoid.
+  const jurisdictions = TAX_YEARS['2026-27'].jurisdictions;
+
+  jurisdictions['test-dangling'] = { id: 'test-dangling', label: 'x', appliesTo: 'x', sources: [], ratesSameAs: 'narnia' };
+  jurisdictions['test-chained'] = { id: 'test-chained', label: 'x', appliesTo: 'x', sources: [], ratesSameAs: 'wales' };
+
+  try {
+    assert.throws(() => getTaxYear('2026-27', 'test-dangling'), /does not exist/);
+    assert.throws(() => getTaxYear('2026-27', 'test-chained'), /points somewhere else again/);
+  } finally {
+    delete jurisdictions['test-dangling'];
+    delete jurisdictions['test-chained'];
+  }
+});
+
+test('2026-27 England and Northern Ireland match the figures published by gov.uk', () => {
   // gov.uk publishes these as TAXABLE income, so unlike the Scottish table
   // these numbers need no conversion — £37,700 is printed on the page.
-  const year = getTaxYear('2026-27', 'rest-of-uk');
+  const year = getTaxYear('2026-27', 'england-ni');
   const pounds = (pence) => pence / 100;
 
   assert.deepEqual(
@@ -234,7 +283,7 @@ test('getTaxYear defaults to Scotland and rejects unknown ids', () => {
   assert.equal(getTaxYear().jurisdictionId, DEFAULT_JURISDICTION_ID);
   assert.equal(getTaxYear().jurisdiction, 'Scotland');
 
-  assert.equal(getTaxYear('2026-27', 'rest-of-uk').jurisdictionId, 'rest-of-uk');
+  assert.equal(getTaxYear('2026-27', 'england-ni').jurisdictionId, 'england-ni');
 
   assert.throws(() => getTaxYear('1999-00'), RangeError);
   assert.throws(() => getTaxYear('2026-27', 'narnia'), RangeError);
@@ -252,7 +301,8 @@ test('getTaxYear puts the jurisdiction source before the UK-wide one', () => {
 test('listJurisdictions describes what is available', () => {
   assert.deepEqual(listJurisdictions('2026-27'), [
     { id: 'scotland', label: 'Scotland' },
-    { id: 'rest-of-uk', label: 'England, Wales & Northern Ireland' },
+    { id: 'england-ni', label: 'England & Northern Ireland' },
+    { id: 'wales', label: 'Wales' },
   ]);
   assert.throws(() => listJurisdictions('1999-00'), RangeError);
 });

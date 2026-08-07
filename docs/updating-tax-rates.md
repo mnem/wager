@@ -51,7 +51,8 @@ Only primary sources. A test enforces that every `sources` URL is on `gov.uk` or
 |---|---|
 | Scottish income tax rates and bands | <https://www.gov.scot/publications/scottish-income-tax-rates-and-bands/> |
 | Personal allowance, NI thresholds and rates | <https://www.gov.uk/guidance/rates-and-thresholds-for-employers-2026-to-2027> (change the year in the URL) |
-| England, Wales and Northern Ireland income tax | <https://www.gov.uk/government/publications/rates-and-allowances-income-tax/income-tax-rates-and-allowances-current-and-past> |
+| England and Northern Ireland income tax | <https://www.gov.uk/government/publications/rates-and-allowances-income-tax/income-tax-rates-and-allowances-current-and-past> |
+| Welsh rates of income tax | <https://www.gov.wales/welsh-rates-income-tax> |
 
 Note the sources publish on **different bases**: gov.scot gives gross ranges,
 gov.uk gives taxable ranges already. Read the page's own wording each time
@@ -109,11 +110,16 @@ Adding a year is a **data-only change**. If it isn't, something has gone wrong.
 > the same values — duplicating them would create two places for one figure to
 > go wrong.
 
-> **Check Wales separately each year.** Wales sets its own rates through the
-> Welsh Rates of Income Tax and currently chooses figures identical to England
-> and Northern Ireland, which is the only reason they share an entry. If Wales
-> ever diverges, give it its own entry under `jurisdictions` rather than
-> stretching the shared one.
+> **Check Wales separately each year.** Wales sets its own rates: the UK rates
+> are reduced by 10p for Welsh taxpayers and the Senedd sets a Welsh rate for
+> each band. It is listed as its own jurisdiction for that reason, even in years
+> like 2026/27 where it picks figures identical to England and Northern Ireland.
+>
+> While they match, the Welsh entry carries `ratesSameAs: 'england-ni'` instead
+> of a copy of the bands, so there is one set of numbers to keep right. **The
+> year Wales diverges, replace `ratesSameAs` with its own `incomeTax` and
+> `publishedBands`** — and update `ratesNote`, which is shown on the page to
+> explain why the figures currently coincide.
 
 ### Worked example — the 2026/27 Scottish bands
 

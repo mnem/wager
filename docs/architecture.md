@@ -106,10 +106,22 @@ reserved to Westminster and identical everywhere. The config mirrors that split
 exactly: bands live under `jurisdictions`, the allowance and NI live on the tax
 year itself.
 
-Wales shares an entry with England and Northern Ireland because the Welsh
-Government currently sets rates identical to theirs — not because it cannot
-differ. If it ever does, Wales needs its own entry, which is a data-only
-change.
+**Wales is listed separately even though its figures currently match England and
+Northern Ireland.** Its tax system genuinely is separate: the UK rates are
+reduced by 10p for Welsh taxpayers and the Senedd sets a Welsh rate for each
+band. For 2026/27 it set 10p in every band, so the totals coincide — a fact
+about this year's rates, not a structural one.
+
+Grouping by "happens to be identical this year" is exactly the kind of thing
+that goes quietly wrong when it stops being true. So Wales gets its own entry,
+its own sources, and a note explaining the coincidence — but declares
+`ratesSameAs` rather than copying the figures, so there is still only one copy
+of the numbers. The day the Senedd chooses differently, that field is replaced
+with real bands and nothing else changes.
+
+`getTaxYear` allows exactly one level of that indirection and throws on a chain,
+because following a chain to find out which figures actually apply is worse than
+duplicating them.
 
 `getTaxYear(yearId, jurisdictionId)` flattens the two into a single object — and
 that object is deliberately the same shape the file produced before
