@@ -37,7 +37,72 @@ const el = {
   verifiedOn: document.getElementById('verified-on'),
   sources: document.getElementById('sources'),
   buildInfo: document.getElementById('build-info'),
+  theme: document.getElementById('theme'),
 };
+
+/* Colour scheme ------------------------------------------------------------ */
+
+/** Where the reader's choice is remembered. Nothing else is stored. */
+const THEME_STORAGE_KEY = 'wager:theme';
+const THEMES = ['light', 'system', 'dark'];
+
+/**
+ * Apply a colour scheme.
+ *
+ * "system" removes the attribute entirely rather than resolving it here, so the
+ * `prefers-color-scheme` media query in the stylesheet stays in charge and keeps
+ * following the system if it changes while the page is open.
+ *
+ * `colorScheme` is set alongside so that form controls, scrollbars and the
+ * browser's own chrome match the choice, not just our own colours.
+ *
+ * @param {string} theme one of THEMES
+ */
+function applyTheme(theme) {
+  const root = document.documentElement;
+  if (theme === 'system') {
+    root.removeAttribute('data-theme');
+    root.style.colorScheme = '';
+  } else {
+    root.setAttribute('data-theme', theme);
+    root.style.colorScheme = theme;
+  }
+}
+
+/**
+ * Read the stored choice, tolerating storage being unavailable.
+ *
+ * Private browsing and blocked-storage settings make localStorage throw rather
+ * than return null, and a broken theme is not worth breaking the calculator for.
+ *
+ * @returns {string} one of THEMES
+ */
+function storedTheme() {
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    return THEMES.includes(stored) ? stored : 'system';
+  } catch {
+    return 'system';
+  }
+}
+
+function setUpTheme() {
+  const theme = storedTheme();
+  applyTheme(theme);
+
+  const selected = el.theme.querySelector(`input[value="${theme}"]`);
+  if (selected) selected.checked = true;
+
+  el.theme.addEventListener('change', (event) => {
+    const chosen = event.target.value;
+    applyTheme(chosen);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, chosen);
+    } catch {
+      // Storage unavailable: the choice still applies for this visit.
+    }
+  });
+}
 
 /* Rendering helpers -------------------------------------------------------- */
 
@@ -302,6 +367,7 @@ function update() {
 el.form.addEventListener('submit', (event) => event.preventDefault());
 el.input.addEventListener('input', update);
 
+setUpTheme();
 renderTaxYearInfo();
 renderBuildInfo();
 update();

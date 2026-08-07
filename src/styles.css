@@ -20,8 +20,22 @@
   --measure: 44rem;
 }
 
+/*
+ * The dark palette appears twice, and the two copies MUST stay identical.
+ *
+ * The first applies when the system asks for dark and the reader has not
+ * overridden it; the second when they have explicitly chosen dark. They cannot
+ * be merged into one rule, because one lives inside a media query and the other
+ * cannot. Duplicating them is the price of the toggle working without
+ * JavaScript having to run before first paint — with the media query intact,
+ * someone with scripting disabled still gets their system preference rather
+ * than being forced to light.
+ *
+ * A CI step asserts the two blocks match, so they cannot drift apart unnoticed.
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
+    /* dark-palette:start */
     --ink: #e8eaef;
     --ink-soft: #a9b1c1;
     --ink-faint: #8b93a3;
@@ -34,7 +48,25 @@
     --warn-line: #574823;
     --warn-ink: #e8cf95;
     --deduction: #f0a08c;
+    /* dark-palette:end */
   }
+}
+
+:root[data-theme='dark'] {
+  /* dark-palette:start */
+  --ink: #e8eaef;
+  --ink-soft: #a9b1c1;
+  --ink-faint: #8b93a3;
+  --paper: #14161a;
+  --card: #1c1f25;
+  --line: #2e333c;
+  --accent: #5fd3b2;
+  --accent-soft: #16302a;
+  --warn-bg: #2b2412;
+  --warn-line: #574823;
+  --warn-ink: #e8cf95;
+  --deduction: #f0a08c;
+  /* dark-palette:end */
 }
 
 *,
@@ -95,9 +127,68 @@ a {
   padding: 3rem 0 0.5rem;
 }
 
+.masthead__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
 .masthead h1 {
   margin: 0;
   font-size: 2rem;
+}
+
+/* Colour scheme toggle ------------------------------------------------------
+
+   A segmented control built from radios, so it is keyboard navigable with the
+   arrow keys and announces as a single group with one selected option. */
+
+.theme {
+  display: flex;
+  margin: 0;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+}
+
+.theme__option {
+  position: relative;
+}
+
+.theme__option input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.theme__option span {
+  display: block;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.theme__option input:checked + span {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.theme__option input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.theme__option:hover input:not(:checked) + span {
+  color: var(--ink-soft);
 }
 
 .tagline {
