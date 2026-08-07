@@ -5,12 +5,34 @@
  * is fully covered by tests that need no DOM. See CLAUDE.md.
  */
 
-import { parseMoneyInput, formatGBP, formatPercent, basisPointsToRate } from './lib/money.js';
+import {
+  parseMoneyInput,
+  parsePercentInput,
+  formatGBP,
+  formatPercent,
+  basisPointsToRate,
+} from './lib/money.js';
 import { salaryForMonthlyNet } from './lib/invert.js';
-import { getTaxYear } from './lib/tax-years.js';
+import { getTaxYear, listJurisdictions, DEFAULT_JURISDICTION_ID } from './lib/tax-years.js';
+import { toEditable, fromEditable, isUnchanged } from './lib/editable.js';
+import { validateTaxYear } from './lib/validate.js';
 import { BUILD } from './version.js';
 
-const YEAR = getTaxYear();
+const TAX_YEAR_ID = '2026-27';
+
+/**
+ * Which jurisdiction's figures are shown, and any edits made to them.
+ *
+ * `year` is always the config actually being calculated with — the published
+ * one, or the edited one. Everything on the page renders from it, so there is
+ * no way for the tables to show one set of figures while the answer uses
+ * another.
+ */
+const state = {
+  jurisdictionId: DEFAULT_JURISDICTION_ID,
+  year: getTaxYear(TAX_YEAR_ID, DEFAULT_JURISDICTION_ID),
+  edits: null,
+};
 
 /** Long enough to skip mid-word keystrokes, short enough not to feel broken. */
 const ANNOUNCE_DELAY_MS = 600;
@@ -38,6 +60,16 @@ const el = {
   sources: document.getElementById('sources'),
   buildInfo: document.getElementById('build-info'),
   theme: document.getElementById('theme'),
+  jurisdiction: document.getElementById('jurisdiction'),
+  bandsHeading: document.getElementById('bands-heading'),
+  ratesNote: document.getElementById('rates-note'),
+  editedNotice: document.getElementById('edited-notice'),
+  resetFigures: document.getElementById('reset-figures'),
+  editor: document.getElementById('editor'),
+  editAllowance: document.getElementById('edit-allowance'),
+  editorIncomeTax: document.querySelector('#editor-income-tax tbody'),
+  editorNationalInsurance: document.querySelector('#editor-national-insurance tbody'),
+  editorError: document.getElementById('editor-error'),
 };
 
 /* Colour scheme ------------------------------------------------------------ */
@@ -102,6 +134,200 @@ function setUpTheme() {
       // Storage unavailable: the choice still applies for this visit.
     }
   });
+}
+
+/* Jurisdiction and edited figures ------------------------------------------- */
+
+/** Remembered like the colour scheme: which country you live in does not change. */
+const JURISDICTION_STORAGE_KEY = 'wager:jurisdiction';
+
+function storedJurisdiction() {
+  try {
+    const stored = localStorage.getItem(JURISDICTION_STORAGE_KEY);
+    return listJurisdictions(TAX_YEAR_ID).some(({ id }) => id === stored)
+      ? stored
+      : DEFAULT_JURISDICTION_ID;
+  } catch {
+    return DEFAULT_JURISDICTION_ID;
+  }
+}
+
+/**
+ * Rebuild the tax year from the current jurisdiction and any edits.
+ *
+ * Edits are discarded when the jurisdiction changes: they were made against a
+ * different set of bands, and silently carrying a Scottish starter-rate change
+ * onto the Welsh table would be worse than losing it.
+ *
+ * @returns {string[]} problems with the edited figures, empty when they are fine
+ */
+function rebuildYear() {
+  const published = getTaxYear(TAX_YEAR_ID, state.jurisdictionId);
+
+  if (!state.edits || isUnchanged(state.edits, published)) {
+    state.edits = null;
+    state.year = published;
+    return [];
+  }
+
+  const candidate = fromEditable(state.edits, published);
+  const problems = validateTaxYear(candidate);
+
+  // Keep calculating with the last good figures rather than showing nothing,
+  // but say plainly that the edits are not being used.
+  if (problems.length === 0) state.year = candidate;
+  return problems;
+}
+
+function setUpJurisdiction() {
+  el.jurisdiction.replaceChildren();
+  for (const { id, label } of listJurisdictions(TAX_YEAR_ID)) {
+    const option = document.createElement('option');
+    option.value = id;
+    option.textContent = label;
+    el.jurisdiction.append(option);
+  }
+
+  state.jurisdictionId = storedJurisdiction();
+  el.jurisdiction.value = state.jurisdictionId;
+
+  el.jurisdiction.addEventListener('change', () => {
+    state.jurisdictionId = el.jurisdiction.value;
+    state.edits = null;
+    try {
+      localStorage.setItem(JURISDICTION_STORAGE_KEY, state.jurisdictionId);
+    } catch {
+      // Storage unavailable; the choice still applies for this visit.
+    }
+    // Without this the page would keep calculating with the previous
+    // jurisdiction while showing the new one's name.
+    rebuildYear();
+    el.editorError.hidden = true;
+    renderTaxYearInfo();
+    renderEditor();
+    update();
+  });
+}
+
+/**
+ * Read every editor input back into an editable tax year.
+ *
+ * Returns null if anything is unparseable, so a half-typed number never reaches
+ * the calculator.
+ *
+ * @returns {import('./lib/editable.js').EditableTaxYear|null}
+ */
+function readEditor() {
+  const published = getTaxYear(TAX_YEAR_ID, state.jurisdictionId);
+  const editable = toEditable(published);
+
+  const allowance = parseMoneyInput(el.editAllowance.value);
+  if (allowance === null) return null;
+  editable.allowancePence = allowance;
+
+  const readRows = (body, bands) =>
+    [...body.querySelectorAll('tr')].every((row, index) => {
+      const band = bands[index];
+      if (!band) return false;
+
+      const rate = parsePercentInput(row.querySelector('.editor-rate').value);
+      if (rate === null) return false;
+      band.rateBasisPoints = rate;
+
+      const limitInput = row.querySelector('.editor-limit');
+      // The final band is unbounded and has no input to read.
+      if (!limitInput) return true;
+
+      const limit = parseMoneyInput(limitInput.value);
+      if (limit === null) return false;
+      band.toPence = limit;
+      return true;
+    });
+
+  if (!readRows(el.editorIncomeTax, editable.incomeTax)) return null;
+  if (!readRows(el.editorNationalInsurance, editable.nationalInsurance)) return null;
+
+  return editable;
+}
+
+/** Build one editable row. The last band has no limit — it is unbounded. */
+function editorRow(band, isLast) {
+  const tr = document.createElement('tr');
+
+  const th = document.createElement('th');
+  th.scope = 'row';
+  th.textContent = band.label;
+
+  const rateCell = document.createElement('td');
+  const rate = document.createElement('input');
+  rate.type = 'text';
+  rate.inputMode = 'decimal';
+  rate.autocomplete = 'off';
+  rate.className = 'editor-rate';
+  rate.value = String(band.rateBasisPoints / 100);
+  rate.setAttribute('aria-label', `${band.label} rate, per cent`);
+  rateCell.append(rate);
+
+  const limitCell = document.createElement('td');
+  if (isLast) {
+    limitCell.textContent = 'and above';
+    limitCell.className = 'editor-unbounded';
+  } else {
+    const limit = document.createElement('input');
+    limit.type = 'text';
+    limit.inputMode = 'decimal';
+    limit.autocomplete = 'off';
+    limit.className = 'editor-limit';
+    limit.value = String((band.toPence ?? 0) / 100);
+    limit.setAttribute('aria-label', `${band.label} upper limit, gross pounds`);
+    limitCell.append(limit);
+  }
+
+  tr.append(th, rateCell, limitCell);
+  return tr;
+}
+
+function renderEditor() {
+  const editable = state.edits ?? toEditable(getTaxYear(TAX_YEAR_ID, state.jurisdictionId));
+
+  el.editAllowance.value = String(editable.allowancePence / 100);
+
+  const fill = (body, bands) => {
+    body.replaceChildren();
+    bands.forEach((band, index) => body.append(editorRow(band, index === bands.length - 1)));
+  };
+  fill(el.editorIncomeTax, editable.incomeTax);
+  fill(el.editorNationalInsurance, editable.nationalInsurance);
+}
+
+function onEdit() {
+  const editable = readEditor();
+
+  if (editable === null) {
+    el.editorError.hidden = false;
+    el.editorError.textContent = 'Some of these figures cannot be read. Rates are percentages, limits are pounds.';
+    return;
+  }
+
+  state.edits = editable;
+  const problems = rebuildYear();
+
+  el.editorError.hidden = problems.length === 0;
+  if (problems.length > 0) {
+    el.editorError.textContent = `Not using these figures: ${problems[0]}`;
+  }
+
+  renderTaxYearInfo();
+  update();
+}
+
+function resetFigures() {
+  state.edits = null;
+  rebuildYear();
+  el.editorError.hidden = true;
+  renderEditor();
+  renderTaxYearInfo();
+  update();
 }
 
 /* Rendering helpers -------------------------------------------------------- */
@@ -221,7 +447,16 @@ function renderBreakdown(body, period) {
 /* Static content ----------------------------------------------------------- */
 
 function renderTaxYearInfo() {
-  el.bandsYear.textContent = YEAR.label;
+  const YEAR = state.year;
+
+  el.bandsHeading.textContent = `${YEAR.jurisdiction} income tax bands, ${YEAR.label}`;
+
+  // The edited warning replaces the verification claim rather than sitting
+  // alongside it, so the page never says "verified" about figures it was handed.
+  el.editedNotice.hidden = !YEAR.edited;
+
+  el.ratesNote.hidden = !YEAR.ratesNote || Boolean(YEAR.edited);
+  if (YEAR.ratesNote) el.ratesNote.textContent = YEAR.ratesNote;
 
   const byId = Object.fromEntries(YEAR.incomeTax.bands.map((band) => [band.id, band]));
   el.bandsBody.replaceChildren();
@@ -255,7 +490,9 @@ function renderTaxYearInfo() {
     )
     .join(', ')}.`;
 
-  el.verifiedOn.textContent = `Rates and thresholds for ${YEAR.label}, last checked against the primary sources on ${YEAR.verifiedOn}.`;
+  el.verifiedOn.textContent = YEAR.verifiedOn
+    ? `Rates and thresholds for ${YEAR.jurisdiction}, ${YEAR.label}, last checked against the primary sources on ${YEAR.verifiedOn}.`
+    : 'These figures have been changed by hand and no longer match the sources below.';
 
   el.sources.replaceChildren();
   for (const source of YEAR.sources) {
@@ -311,6 +548,7 @@ function clearResult(message) {
 }
 
 function update() {
+  const YEAR = state.year;
   const raw = el.input.value;
 
   if (raw.trim() === '') {
@@ -338,7 +576,9 @@ function update() {
     suggestion.monthly.grossPence,
   )} a month before deductions, taking home ${formatGBP(suggestion.monthly.netPence)}.`;
 
-  el.breakdownIntro.textContent = `Based on Scottish income tax bands for ${YEAR.label}. Figures may differ by a penny from a payslip, because payroll rounds each pay period separately.`;
+  el.breakdownIntro.textContent = YEAR.edited
+    ? `Based on figures you changed by hand, not the published rates for ${YEAR.label}.`
+    : `Based on ${YEAR.jurisdiction} income tax bands for ${YEAR.label}. Figures may differ by a penny from a payslip, because payroll rounds each pay period separately.`;
 
   renderBreakdown(el.annualBody, suggestion.annual);
   renderBreakdown(el.monthlyBody, suggestion.monthly);
@@ -368,6 +608,11 @@ el.form.addEventListener('submit', (event) => event.preventDefault());
 el.input.addEventListener('input', update);
 
 setUpTheme();
+setUpJurisdiction();
+rebuildYear();
+renderEditor();
+el.editor.addEventListener('input', onEdit);
+el.resetFigures.addEventListener('click', resetFigures);
 renderTaxYearInfo();
 renderBuildInfo();
 update();

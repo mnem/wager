@@ -609,3 +609,162 @@ tbody tr.is-total td.numeric:first-of-type {
   white-space: nowrap;
   border: 0;
 }
+
+/* Jurisdiction picker ------------------------------------------------------ */
+
+#jurisdiction {
+  padding: 0.55rem 0.7rem;
+  max-width: 20rem;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: inherit;
+  font: inherit;
+  font-size: 1rem;
+}
+
+#jurisdiction:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.field + .field {
+  margin-top: 1.5rem;
+}
+
+/* Edited-figures warning --------------------------------------------------- */
+
+.notice--edited {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-line);
+  color: var(--warn-ink);
+  margin: 0 0 1rem;
+}
+
+.linklike {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.linklike:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.bands__rates-note {
+  margin: 0 0 1rem;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+}
+
+/* The editor --------------------------------------------------------------- */
+
+.editor {
+  margin-top: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  font-size: 0.9rem;
+}
+
+.editor > summary {
+  padding: 0.7rem 2.5rem 0.7rem 1rem;
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+  font-weight: 600;
+}
+
+.editor > summary::-webkit-details-marker {
+  display: none;
+}
+
+.editor > summary::after {
+  content: '';
+  position: absolute;
+  right: 1.1rem;
+  top: 1rem;
+  width: 0.45em;
+  height: 0.45em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+  opacity: 0.55;
+}
+
+.editor[open] > summary::after {
+  transform: rotate(225deg);
+}
+
+.editor > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: var(--radius);
+}
+
+.editor__body {
+  padding: 0 1rem 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.editor__intro {
+  color: var(--ink-soft);
+  margin: 0.9rem 0;
+}
+
+.editor__field {
+  margin-bottom: 1.25rem;
+}
+
+.editor__field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.editor__table {
+  margin-bottom: 1.25rem;
+}
+
+.editor__table caption {
+  text-align: left;
+  font-weight: 600;
+  padding-bottom: 0.4rem;
+}
+
+.editor__table th[scope='row'] {
+  font-weight: 400;
+  color: var(--ink-soft);
+  padding-left: 0;
+}
+
+.editor input,
+.editor__field input {
+  width: 100%;
+  max-width: 9rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: inherit;
+  font: inherit;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.editor input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.editor-unbounded {
+  color: var(--ink-faint);
+  font-style: italic;
+}
