@@ -6,7 +6,7 @@
     <title>Wager — what salary do I need to take home £X a month?</title>
     <meta
       name="description"
-      content="Work backwards from a monthly take-home wage to the gross annual salary that produces it, using Scottish income tax bands and UK National Insurance."
+      content="Work backwards from a monthly take-home wage to the gross annual salary that produces it, using the income tax bands for Scotland, England and Northern Ireland, or Wales, plus UK National Insurance."
     />
     <meta name="color-scheme" content="light dark" />
     <link rel="stylesheet" href="./styles.css" />
@@ -50,16 +50,19 @@
     <main>
       <!-- Collapsed by default, but the summary alone still carries the two
            things that must always be visible: that this is an estimate, and
-           that it uses Scottish bands. Only the elaboration is hidden. -->
+           whose bands it is using. The jurisdiction is filled in from the
+           picker — a fixed "Scottish" here would tell most of the country
+           something untrue. Only the elaboration is hidden. -->
       <details class="notice notice--estimate">
         <summary>
-          <strong>This is an estimate</strong>, using <strong>Scottish income tax bands</strong>
+          <strong>This is an estimate</strong>, using the income tax bands for
+          <strong><span id="estimate-jurisdiction"></span></strong>
         </summary>
         <p>
-          It covers Scottish income tax and UK-wide employee National Insurance, and
-          deliberately ignores pensions, student loans and anything unusual about your tax code.
-          Don't rely on it for anything that matters without checking the figures yourself —
-          the sources are linked at the bottom of this page.
+          It covers income tax for <span id="estimate-jurisdiction-body"></span> and UK-wide
+          employee National Insurance, and deliberately ignores pensions, student loans and anything
+          unusual about your tax code. Don't rely on it for anything that matters without
+          checking the figures yourself — the sources are linked at the bottom of this page.
         </p>
       </details>
 
@@ -153,7 +156,10 @@
         <details class="exclusions">
           <summary>What this doesn't include</summary>
           <div class="exclusions__body">
-            <p>The calculation covers Scottish income tax and employee National Insurance only.</p>
+            <p>
+              The calculation covers income tax for
+              <span id="exclusions-jurisdiction"></span> and employee National Insurance only.
+            </p>
             <p><strong>It does not account for:</strong></p>
             <ul>
               <li>pension contributions or salary sacrifice</li>
@@ -162,16 +168,12 @@
               <li>any tax code other than the standard one</li>
               <li>the marriage allowance or blind person's allowance</li>
               <li>
-                savings and dividend income, which is taxed at UK-wide rates even for Scottish
-                taxpayers
+                savings and dividend income, which is taxed at UK-wide rates wherever you live
               </li>
             </ul>
             <p><strong>Also worth knowing:</strong></p>
             <ul>
-              <li>
-                Scottish rates apply to earned income if your main home is in Scotland. If it
-                isn't, these figures don't apply to you.
-              </li>
+              <li id="exclusions-applies-to"></li>
               <li>
                 National Insurance is worked out annually here, but real payroll calculates it
                 separately for each pay period. A real payslip may differ slightly.

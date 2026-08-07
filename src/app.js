@@ -70,6 +70,10 @@ const el = {
   editorIncomeTax: document.querySelector('#editor-income-tax tbody'),
   editorNationalInsurance: document.querySelector('#editor-national-insurance tbody'),
   editorError: document.getElementById('editor-error'),
+  estimateJurisdiction: document.getElementById('estimate-jurisdiction'),
+  estimateJurisdictionBody: document.getElementById('estimate-jurisdiction-body'),
+  exclusionsJurisdiction: document.getElementById('exclusions-jurisdiction'),
+  exclusionsAppliesTo: document.getElementById('exclusions-applies-to'),
 };
 
 /* Colour scheme ------------------------------------------------------------ */
@@ -450,6 +454,15 @@ function renderTaxYearInfo() {
   const YEAR = state.year;
 
   el.bandsHeading.textContent = `${YEAR.jurisdiction} income tax bands, ${YEAR.label}`;
+
+  // The always-visible estimate notice and the exclusions both name a
+  // jurisdiction. Left static they would tell most of the country something
+  // untrue, so they follow the picker like everything else.
+  el.estimateJurisdiction.textContent = YEAR.jurisdiction;
+  el.estimateJurisdictionBody.textContent = YEAR.jurisdiction;
+  el.exclusionsJurisdiction.textContent = YEAR.jurisdiction;
+  el.exclusionsAppliesTo.textContent =
+    `These rates apply to earned income for ${YEAR.appliesTo}. If that isn't you, choose where you live above.`;
 
   // The edited warning replaces the verification claim rather than sitting
   // alongside it, so the page never says "verified" about figures it was handed.

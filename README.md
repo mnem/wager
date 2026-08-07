@@ -42,8 +42,9 @@ annually, whereas real payroll calculates it per pay period, so a real payslip m
 differ slightly.
 
 Don't use it for anything that matters without checking the numbers yourself. The
-page links to the gov.scot and gov.uk sources the figures come from, and shows the
-date they were last verified.
+page links to the official sources the figures come from — gov.scot, gov.uk or
+gov.wales, depending on which jurisdiction you pick — and shows the date they
+were last verified.
 
 ## Development
 

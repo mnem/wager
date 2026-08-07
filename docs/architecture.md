@@ -138,8 +138,10 @@ identical values for both.
 This is the single easiest thing to get wrong, so it has its own section in
 [updating-tax-rates.md](updating-tax-rates.md).
 
-gov.scot publishes bands as ranges of **gross** income. The config stores
-cumulative limits on **taxable** income (gross minus the personal allowance).
+The two governments publish on **different bases**: gov.scot gives ranges of
+**gross** income, gov.uk gives **taxable** income directly. The config stores
+cumulative limits on taxable income (gross minus the personal allowance), so
+reading the wrong source's basis is the easiest way to be wrong by £12,570.
 `publishedBands` carries the official gross table alongside, purely for display,
 and a test asserts the two representations agree.
 
