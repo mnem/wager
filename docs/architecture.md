@@ -232,8 +232,12 @@ Two deserve special mention.
 between £100,000 and £125,140, asserting a penny of gross never costs more than
 a penny of deductions. It was originally a strided sample; review pointed out
 that a stride is a spot check, not a proof, since violations recur with a period
-determined by the rates and could sit between samples. Two seconds buys an
-unconditional guarantee.
+determined by the rates and could sit between samples.
+
+That sweep dominates the suite's runtime: about 2 seconds locally, but **around
+9.5 seconds on GitHub's shared runners**, where the whole suite takes roughly
+10 seconds. Worth knowing because the cost is linear in the width of the taper —
+if a future tax year widens it substantially, this is the test that will notice.
 
 **Round-trip tests assert minimality, not just sufficiency.** Sufficiency alone
 is satisfied by returning a huge number. `net(g-1) < target` is the half that
