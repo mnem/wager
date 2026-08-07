@@ -4,26 +4,42 @@ import assert from 'node:assert/strict';
 import {
   TAX_YEARS,
   DEFAULT_TAX_YEAR_ID,
+  DEFAULT_JURISDICTION_ID,
   getTaxYear,
   listTaxYearIds,
+  listJurisdictions,
 } from '../src/lib/tax-years.js';
 import { computeAnnual } from '../src/lib/calculator.js';
 
-const ALL_YEARS = Object.entries(TAX_YEARS);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * Structural invariants. These run over every configured year, so adding a
- * malformed tax year in future is a CI failure rather than a wrong answer.
+ * Every (tax year, jurisdiction) pair, resolved through `getTaxYear` — which is
+ * also the only shape the calculator ever sees. Testing the resolved form means
+ * the invariants below cover the flattening as well as the data.
  */
-for (const [id, year] of ALL_YEARS) {
-  test(`${id}: identity and provenance`, () => {
-    assert.equal(year.id, id, 'id must match its key');
-    assert.equal(year.jurisdiction, 'Scotland');
+const ALL_CONFIGS = Object.keys(TAX_YEARS).flatMap((yearId) =>
+  listJurisdictions(yearId).map(({ id }) => ({
+    name: `${yearId}/${id}`,
+    config: getTaxYear(yearId, id),
+  })),
+);
+
+/**
+ * Structural invariants. These run over every configured year and jurisdiction,
+ * so adding a malformed one in future is a CI failure rather than a wrong
+ * answer.
+ */
+for (const { name, config: year } of ALL_CONFIGS) {
+  test(`${name}: identity and provenance`, () => {
     assert.match(year.startsOn, ISO_DATE);
     assert.match(year.endsOn, ISO_DATE);
     assert.ok(year.endsOn > year.startsOn);
     assert.match(year.label, /^\d{4}\/\d{2}$/);
+
+    assert.ok(year.jurisdictionId, 'a resolved year names its jurisdiction');
+    assert.ok(year.jurisdiction, 'and carries a human-readable label');
+    assert.ok(year.appliesTo, 'and says who it applies to, so people can check');
 
     assert.match(year.verifiedOn, ISO_DATE, 'verifiedOn is required — see CLAUDE.md');
     assert.ok(Array.isArray(year.sources) && year.sources.length > 0, 'sources are required');
@@ -33,7 +49,7 @@ for (const [id, year] of ALL_YEARS) {
     }
   });
 
-  test(`${id}: personal allowance`, () => {
+  test(`${name}: personal allowance`, () => {
     const { amountPence, taper } = year.personalAllowance;
     assert.ok(Number.isSafeInteger(amountPence) && amountPence > 0);
     assert.ok(Number.isSafeInteger(taper.thresholdPence) && taper.thresholdPence > amountPence);
@@ -42,7 +58,7 @@ for (const [id, year] of ALL_YEARS) {
   });
 
   for (const scheme of ['incomeTax', 'nationalInsurance']) {
-    test(`${id}: ${scheme} bands are well formed`, () => {
+    test(`${name}: ${scheme} bands are well formed`, () => {
       const { appliesTo, bands } = year[scheme];
       assert.ok(['taxable', 'gross'].includes(appliesTo));
       assert.ok(bands.length > 0);
@@ -78,7 +94,7 @@ for (const [id, year] of ALL_YEARS) {
     });
   }
 
-  test(`${id}: one more penny of gross never costs more than one penny`, () => {
+  test(`${name}: one more penny of gross never costs more than one penny`, () => {
     // The property the net-to-gross inversion rests on. Bisection is only valid
     // while net pay never falls as gross pay rises, which holds exactly when a
     // penny of gross costs at most a penny of deductions.
@@ -92,10 +108,10 @@ for (const [id, year] of ALL_YEARS) {
     //     drops, taxable income rises by 2p for 1p of gross, not 1.5p.
     //
     //   - Taking the independent maxima of the tax and NI rates is too strict.
-    //     The largest NI rate here is the 8% main rate, but that only applies
-    //     below the upper earnings limit, where the top rate of income tax
-    //     cannot apply. 48% and 8% never coexist, so combining them invents a
-    //     failure that no income can produce.
+    //     The largest NI rate is the 8% main rate, but that only applies below
+    //     the upper earnings limit, where the highest band of income tax cannot
+    //     apply. They never coexist, so combining them invents a failure that no
+    //     income can produce.
     //
     // Checking the actual function around every rate change avoids having to
     // encode which rates can coexist, and stays correct if a future year
@@ -138,10 +154,8 @@ for (const [id, year] of ALL_YEARS) {
     // one bad penny could sit between two samples.
     //
     // The taper is finite — 2,514,000 pennies for this config — so there is no
-    // need to sample it at all. Checking every penny costs a few seconds and
-    // turns the strongest guarantee in the suite from "probably" into "always".
-    // Walk once carrying the previous value, so it is one calculation per penny
-    // rather than two.
+    // need to sample it at all. Checking every penny costs a couple of seconds
+    // locally and about ten in CI, and makes the guarantee unconditional.
     let previousDeductions = deductionsAt(taper.thresholdPence);
     for (let gross = taper.thresholdPence + 1; gross <= taperEndsAt; gross += 1) {
       const deductions = deductionsAt(gross);
@@ -154,9 +168,9 @@ for (const [id, year] of ALL_YEARS) {
     }
   });
 
-  test(`${id}: published gross bands agree with the taxable bands`, () => {
-    // publishedBands duplicates gov.scot's official gross table for display.
-    // This is the test that makes the duplication safe.
+  test(`${name}: published gross bands agree with the taxable bands`, () => {
+    // publishedBands is the official table as GROSS ranges. This is the test
+    // that makes carrying both representations safe.
     const { bands } = year.incomeTax;
     const published = year.publishedBands;
     const allowance = year.personalAllowance.amountPence;
@@ -198,20 +212,19 @@ for (const [id, year] of ALL_YEARS) {
       assert.equal(
         band.upToPence,
         expectedTaxable,
-        `${band.id}: gov.scot's gross limit and the configured taxable limit disagree`,
+        `${band.id}: the published gross limit and the configured taxable limit disagree`,
       );
     });
   });
 }
 
-test('2026-27 matches the figures published by gov.scot and gov.uk', () => {
-  // Spelled out in pounds so a mistyped threshold is obvious on review, and so
-  // this test can be checked against the source pages by eye.
-  const year = getTaxYear('2026-27');
-  const pounds = (pence) => pence / 100;
+/* Figures, pinned ---------------------------------------------------------- */
 
-  assert.equal(pounds(year.personalAllowance.amountPence), 12_570);
-  assert.equal(pounds(year.personalAllowance.taper.thresholdPence), 100_000);
+test('2026-27 Scotland matches the figures published by gov.scot', () => {
+  // Spelled out in pounds so a mistyped threshold is obvious on review, and so
+  // this test can be checked against the source page by eye.
+  const year = getTaxYear('2026-27', 'scotland');
+  const pounds = (pence) => pence / 100;
 
   assert.deepEqual(
     year.publishedBands.map((band) => [
@@ -240,9 +253,56 @@ test('2026-27 matches the figures published by gov.scot and gov.uk', () => {
       ['top', 4800],
     ],
   );
+});
+
+test('2026-27 rest of the UK matches the figures published by gov.uk', () => {
+  // gov.uk publishes these as TAXABLE income, so unlike the Scottish table
+  // these numbers need no conversion — £37,700 is printed on the page.
+  const year = getTaxYear('2026-27', 'rest-of-uk');
+  const pounds = (pence) => pence / 100;
 
   assert.deepEqual(
-    year.nationalInsurance.bands.map((band) => [
+    year.incomeTax.bands.map((band) => [
+      band.id,
+      band.rateBasisPoints,
+      band.upToPence === Infinity ? null : pounds(band.upToPence),
+    ]),
+    [
+      ['basic', 2000, 37_700],
+      ['higher', 4000, 125_140],
+      ['additional', 4500, null],
+    ],
+  );
+
+  assert.deepEqual(
+    year.publishedBands.map((band) => [
+      band.id,
+      pounds(band.fromPence),
+      band.toPence === null ? null : pounds(band.toPence),
+    ]),
+    [
+      ['basic', 12_571, 50_270],
+      ['higher', 50_271, 125_140],
+      ['additional', 125_141, null],
+    ],
+  );
+});
+
+test('the personal allowance and National Insurance are identical everywhere', () => {
+  // Both are reserved to Westminster. Storing them once on the year rather than
+  // per jurisdiction is what guarantees this, so the test is really asserting
+  // that the flattening does not accidentally diverge them.
+  const [first, ...rest] = ALL_CONFIGS.map(({ config }) => config);
+  for (const other of rest) {
+    assert.deepEqual(other.personalAllowance, first.personalAllowance);
+    assert.deepEqual(other.nationalInsurance, first.nationalInsurance);
+  }
+
+  const pounds = (pence) => pence / 100;
+  assert.equal(pounds(first.personalAllowance.amountPence), 12_570);
+  assert.equal(pounds(first.personalAllowance.taper.thresholdPence), 100_000);
+  assert.deepEqual(
+    first.nationalInsurance.bands.map((band) => [
       band.id,
       band.rateBasisPoints,
       band.upToPence === Infinity ? null : pounds(band.upToPence),
@@ -255,28 +315,54 @@ test('2026-27 matches the figures published by gov.scot and gov.uk', () => {
   );
 });
 
-test('the allowance taper reaches zero exactly where the top rate begins', () => {
-  // This is the relationship that makes the advanced-rate limit £125,140 rather
-  // than £112,570. If it ever stops holding, the config needs rethinking rather
-  // than patching.
-  const year = getTaxYear('2026-27');
-  const { amountPence, taper } = year.personalAllowance;
-  const allowanceGoneAt =
-    taper.thresholdPence + (amountPence * taper.withdraw.per) / taper.withdraw.lose;
+test('the allowance taper reaches zero exactly where the highest band begins', () => {
+  // This is the relationship that makes the Scottish advanced limit £125,140
+  // rather than £112,570 — and the same relationship puts the rest-of-UK higher
+  // band's limit at £125,140 too.
+  for (const { name, config: year } of ALL_CONFIGS) {
+    const { amountPence, taper } = year.personalAllowance;
+    const allowanceGoneAt =
+      taper.thresholdPence + (amountPence * taper.withdraw.per) / taper.withdraw.lose;
 
-  assert.equal(allowanceGoneAt, 12_514_000, 'the allowance is exhausted at £125,140');
-  assert.equal(
-    year.incomeTax.bands.find((b) => b.id === 'advanced').upToPence,
-    allowanceGoneAt,
-    'the advanced band ends where the allowance runs out, so taxable equals gross there',
-  );
+    assert.equal(allowanceGoneAt, 12_514_000, `${name}: the allowance is exhausted at £125,140`);
+
+    const penultimate = year.incomeTax.bands.at(-2);
+    assert.equal(
+      penultimate.upToPence,
+      allowanceGoneAt,
+      `${name}: ${penultimate.id} must end where the allowance runs out, so taxable equals gross there`,
+    );
+  }
 });
 
-test('getTaxYear defaults, looks up and rejects unknown ids', () => {
+/* Lookup ------------------------------------------------------------------- */
+
+test('getTaxYear defaults to Scotland and rejects unknown ids', () => {
   assert.equal(getTaxYear().id, DEFAULT_TAX_YEAR_ID);
-  assert.equal(getTaxYear('2026-27').id, '2026-27');
+  assert.equal(getTaxYear().jurisdictionId, DEFAULT_JURISDICTION_ID);
+  assert.equal(getTaxYear().jurisdiction, 'Scotland');
+
+  assert.equal(getTaxYear('2026-27', 'rest-of-uk').jurisdictionId, 'rest-of-uk');
+
   assert.throws(() => getTaxYear('1999-00'), RangeError);
+  assert.throws(() => getTaxYear('2026-27', 'narnia'), RangeError);
   assert.throws(() => getTaxYear(null), RangeError);
+});
+
+test('getTaxYear puts the jurisdiction source before the UK-wide one', () => {
+  // The most specific reference should be the first a reader sees.
+  const scotland = getTaxYear('2026-27', 'scotland');
+  assert.match(scotland.sources[0].url, /gov\.scot/);
+  assert.match(scotland.sources.at(-1).url, /gov\.uk/);
+  assert.equal(scotland.sources.length, 2);
+});
+
+test('listJurisdictions describes what is available', () => {
+  assert.deepEqual(listJurisdictions('2026-27'), [
+    { id: 'scotland', label: 'Scotland' },
+    { id: 'rest-of-uk', label: 'England, Wales & Northern Ireland' },
+  ]);
+  assert.throws(() => listJurisdictions('1999-00'), RangeError);
 });
 
 test('the default tax year is configured', () => {
