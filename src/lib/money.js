@@ -83,7 +83,12 @@ export function parsePercentInput(raw) {
   return Number.isSafeInteger(basisPoints) ? basisPoints : null;
 }
 
-/** Matches a plain decimal, or one with correctly-grouped thousands separators. */
+/**
+ * Matches a plain decimal, or one with correctly-grouped thousands separators.
+ *
+ * Separators are normalised to commas before this runs, so one grammar governs
+ * both conventions rather than each being policed differently.
+ */
 const MONEY_SHAPE = /^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.(\d+))?$/;
 
 /**
@@ -118,6 +123,12 @@ function decimalStringToPence(decimal) {
  * and any number of decimal places (rounded to the nearest penny). Rejects
  * negatives, junk, and empty input.
  *
+ * A space is treated as a thousands separator, not as noise to be discarded —
+ * so it has to be correctly placed, exactly like a comma. Stripping whitespace
+ * unconditionally meant "12 34.56" was quietly read as £1,234.56 while the
+ * equivalent "12,3456" was rejected, and "1 2 3" came out as £123. Two
+ * conventions for the same thing, held to different standards.
+ *
  * @param {string|number} raw
  * @returns {number|null} integer pence, or null if it isn't a valid amount
  */
@@ -128,7 +139,12 @@ export function parseMoneyInput(raw) {
   const cleaned = String(raw)
     .trim()
     .replace(/^£/, '')
-    .replace(/\s/g, '');
+    // A currency symbol may be followed by a space; that one is decoration
+    // rather than a separator, so it goes before the rest are given meaning.
+    .trim()
+    // Non-breaking spaces reach us from pasted text and some keyboards, and
+    // read as separators just like ordinary ones.
+    .replace(/[\s\u00A0]/g, ',');
 
   if (!MONEY_SHAPE.test(cleaned)) return null;
 
