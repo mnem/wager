@@ -32,11 +32,12 @@ const MONTHS_PER_YEAR = 12;
  * Hard ceiling on the gross salary the search will consider: £100,000,000.
  *
  * This is not just a sanity limit, it is what keeps the arithmetic exact. The
- * calculator multiplies pence by basis points, so a gross of £100m produces
- * charges around 4.8e14 — still comfortably inside Number.MAX_SAFE_INTEGER.
- * Letting the bracket double freely would overflow that and fail with a
- * confusing type error from deep inside the calculator instead of a clear one
- * from here.
+ * calculator multiplies pence by basis points, so a gross of £100m produces a
+ * combined charge around 5.0e13 basis-point units — about 180x inside
+ * Number.MAX_SAFE_INTEGER (9.0e15), so there is room for a future year to add
+ * bands or raise rates. Letting the bracket double freely would overflow that
+ * and fail with a confusing type error from deep inside the calculator instead
+ * of a clear one from here.
  */
 const MAX_GROSS_PENCE = 100_000_000_00;
 
