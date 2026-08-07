@@ -9,7 +9,7 @@ import {
   listTaxYearIds,
   listJurisdictions,
 } from '../src/lib/tax-years.js';
-import { computeAnnual } from '../src/lib/calculator.js';
+import { validateTaxYear } from '../src/lib/validate.js';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -49,123 +49,15 @@ for (const { name, config: year } of ALL_CONFIGS) {
     }
   });
 
-  test(`${name}: personal allowance`, () => {
-    const { amountPence, taper } = year.personalAllowance;
-    assert.ok(Number.isSafeInteger(amountPence) && amountPence > 0);
-    assert.ok(Number.isSafeInteger(taper.thresholdPence) && taper.thresholdPence > amountPence);
-    assert.ok(Number.isSafeInteger(taper.withdraw.lose) && taper.withdraw.lose > 0);
-    assert.ok(Number.isSafeInteger(taper.withdraw.per) && taper.withdraw.per >= taper.withdraw.lose);
-  });
-
-  for (const scheme of ['incomeTax', 'nationalInsurance']) {
-    test(`${name}: ${scheme} bands are well formed`, () => {
-      const { appliesTo, bands } = year[scheme];
-      assert.ok(['taxable', 'gross'].includes(appliesTo));
-      assert.ok(bands.length > 0);
-
-      const ids = bands.map((band) => band.id);
-      assert.equal(new Set(ids).size, ids.length, 'band ids must be unique');
-
-      let previousLimit = 0;
-      for (const band of bands) {
-        assert.ok(band.id, 'every band needs an id');
-        assert.ok(band.label, `band ${band.id} needs a label`);
-        assert.ok(
-          Number.isSafeInteger(band.rateBasisPoints) &&
-            band.rateBasisPoints >= 0 &&
-            band.rateBasisPoints < 10_000,
-          `band ${band.id} rate must be integer basis points below 100%`,
-        );
-        assert.ok(
-          band.upToPence > previousLimit,
-          `band ${band.id} limit must exceed the previous one — no gaps, no overlaps`,
-        );
-        if (Number.isFinite(band.upToPence)) {
-          assert.ok(Number.isSafeInteger(band.upToPence), `band ${band.id} limit must be integer pence`);
-        }
-        previousLimit = band.upToPence;
-      }
-
-      assert.equal(
-        bands.at(-1).upToPence,
-        Infinity,
-        'the final band must be unbounded, or income above it would be untaxed',
-      );
-    });
-  }
-
-  test(`${name}: one more penny of gross never costs more than one penny`, () => {
-    // The property the net-to-gross inversion rests on. Bisection is only valid
-    // while net pay never falls as gross pay rises, which holds exactly when a
-    // penny of gross costs at most a penny of deductions.
+  test(`${name}: is a usable tax year`, () => {
+    // The structural invariants and the monotonicity property live in
+    // src/lib/validate.js rather than here, so that the tests and the UI check
+    // exactly the same things. Duplicating them would let the two drift, and
+    // the UI's copy is the one a person can break.
     //
-    // This is asserted directly rather than through a closed-form bound on the
-    // rates, because every simple bound is wrong in one direction or the other:
-    //
-    //   - The AVERAGE taper multiplier (per + lose) / per = 1.5 is too loose.
-    //     personalAllowanceFor floors the taper, so the allowance drops in
-    //     whole-penny steps rather than smoothly; on the pennies where it
-    //     drops, taxable income rises by 2p for 1p of gross, not 1.5p.
-    //
-    //   - Taking the independent maxima of the tax and NI rates is too strict.
-    //     The largest NI rate is the 8% main rate, but that only applies below
-    //     the upper earnings limit, where the highest band of income tax cannot
-    //     apply. They never coexist, so combining them invents a failure that no
-    //     income can produce.
-    //
-    // Checking the actual function around every rate change avoids having to
-    // encode which rates can coexist, and stays correct if a future year
-    // reshapes the bands entirely.
-    const { amountPence, taper } = year.personalAllowance;
-    const taperEndsAt = taper.thresholdPence + (amountPence * taper.withdraw.per) / taper.withdraw.lose;
-
-    const rateChanges = new Set([0, amountPence, taper.thresholdPence, taperEndsAt]);
-    for (const band of year.nationalInsurance.bands) {
-      if (Number.isFinite(band.upToPence)) rateChanges.add(band.upToPence);
-    }
-    for (const band of year.incomeTax.bands) {
-      if (!Number.isFinite(band.upToPence)) continue;
-      // Income tax limits are on taxable income; the corresponding gross is the
-      // limit plus whatever allowance survives, which is the full allowance
-      // below the taper and nothing above it.
-      rateChanges.add(band.upToPence + amountPence);
-      rateChanges.add(band.upToPence);
-    }
-
-    const deductionsAt = (grossPence) => computeAnnual(grossPence, year).totalDeductionsPence;
-
-    for (const point of rateChanges) {
-      for (let gross = Math.max(0, point - 300); gross <= point + 300; gross += 1) {
-        const cost = deductionsAt(gross + 1) - deductionsAt(gross);
-        assert.ok(
-          cost >= 0 && cost <= 1,
-          `at gross ${gross} one more penny cost ${cost}p in deductions`,
-        );
-      }
-    }
-
-    // The taper is swept exhaustively rather than sampled.
-    //
-    // Review raised this: a stride is a spot check, not a proof. The pennies
-    // that violate the property are those where the running charge crosses a
-    // rounding boundary, and how often that happens depends on the rates. For
-    // some future rate the pattern could repeat with a period longer than the
-    // number of samples a fixed stride can take across a bounded range, so the
-    // one bad penny could sit between two samples.
-    //
-    // The taper is finite — 2,514,000 pennies for this config — so there is no
-    // need to sample it at all. Checking every penny costs a couple of seconds
-    // locally and about ten in CI, and makes the guarantee unconditional.
-    let previousDeductions = deductionsAt(taper.thresholdPence);
-    for (let gross = taper.thresholdPence + 1; gross <= taperEndsAt; gross += 1) {
-      const deductions = deductionsAt(gross);
-      const cost = deductions - previousDeductions;
-      assert.ok(
-        cost >= 0 && cost <= 1,
-        `in the taper, going from gross ${gross - 1} to ${gross} cost ${cost}p in deductions`,
-      );
-      previousDeductions = deductions;
-    }
+    // Exhaustive rather than sampled: for a committed config this is a proof,
+    // and it is what earns the right to ship a sampled check at runtime.
+    assert.deepEqual(validateTaxYear(year, { monotonicity: 'exhaustive' }), []);
   });
 
   test(`${name}: published gross bands agree with the taxable bands`, () => {
