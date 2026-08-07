@@ -166,6 +166,27 @@ converges in about forty iterations, and stays correct if a future tax year
 gains a band, changes the taper ratio, or introduces a new deduction. Given that
 adding a tax year must be a data-only change, that robustness is the point.
 
+**The ceiling is load-bearing, not a sanity limit.** `MAX_GROSS_PENCE` is
+£100,000,000 because the calculator multiplies pence by basis points; at that
+gross the combined charge is about 5.0e13, roughly 180× inside
+`Number.MAX_SAFE_INTEGER`. Two bugs lived here and both are worth knowing before
+touching the search:
+
+- The ceiling was originally enforced only on the *upper* bound. But the lower
+  bound starts at the target itself, so an absurd target went straight into the
+  calculator, lost precision, and surfaced as a `TypeError` from inside
+  `roundHalfUp` — the exact confusing failure the ceiling existed to prevent.
+  It is now checked before anything else, which makes every later calculation
+  provably in range.
+- Growing the bracket by doubling could *overshoot* the ceiling and give up,
+  rejecting targets that had a real answer just below it. Every target in
+  `(£50,000,000.00, £50,010,355.05]` threw despite being reachable. The bracket
+  now clamps to the ceiling rather than bailing out.
+
+Both are covered by `test/invert.test.js` — *finds answers right up to the
+ceiling* and *rejects unreachable targets clearly, never with an overflow*. If
+you simplify that clamping, those tests are what will tell you.
+
 ### 5. The *monthly* search works in whole pounds
 
 Two separate traps here, both found by running the real page rather than by
@@ -269,6 +290,25 @@ is never modified in git. The footer links to
 The version comes from the release tag when deploying a release, or
 `git describe --tags --always` on a push to main (giving honest strings like
 `v1.2.0-3-gabc1234`).
+
+### `version.js` is generated with `JSON.stringify`, not string interpolation
+
+The deploy workflow builds `version.js` by passing values through the
+environment into a small `node` script that serialises them with
+`JSON.stringify`. That looks like a roundabout way to write five lines of
+JavaScript, and it is deliberate.
+
+The original version interpolated the version straight into a quoted JS string.
+A tag containing a single quote closes that literal and appends whatever
+follows — and `node --check` passes it, because the result is still
+syntactically valid JavaScript. Since `app.js` imports `version.js`, that code
+would run in every visitor's browser on every page load. It was verified
+exploitable before being fixed.
+
+Escaping is now structural rather than dependent on the input being well
+behaved, and an allowlist rejects anything that is not a plain version string
+before it reaches the generator. Either alone would close it; both means a
+mistake in one is not fatal.
 
 ### The workflow trap worth knowing about
 
