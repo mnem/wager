@@ -51,10 +51,12 @@ Only primary sources. A test enforces that every `sources` URL is on `gov.uk` or
 |---|---|
 | Scottish income tax rates and bands | <https://www.gov.scot/publications/scottish-income-tax-rates-and-bands/> |
 | Personal allowance, NI thresholds and rates | <https://www.gov.uk/guidance/rates-and-thresholds-for-employers-2026-to-2027> (change the year in the URL) |
+| England, Wales and Northern Ireland income tax | <https://www.gov.uk/government/publications/rates-and-allowances-income-tax/income-tax-rates-and-allowances-current-and-past> |
 
-Note the two publish on **different bases**: gov.scot gives gross ranges,
+Note the sources publish on **different bases**: gov.scot gives gross ranges,
 gov.uk gives taxable ranges already. Read the page's own wording each time
-rather than assuming.
+rather than assuming — this is the single most likely place to introduce a
+wrong figure.
 
 ---
 
@@ -85,17 +87,27 @@ Adding a year is a **data-only change**. If it isn't, something has gone wrong.
 
 1. Copy the most recent entry in `TAX_YEARS` and change its key, `id`, `label`,
    `startsOn` and `endsOn`.
-2. Work through every figure against the primary sources:
+2. Work through the **year-level** figures, which are reserved to Westminster
+   and therefore the same everywhere:
    - personal allowance amount and taper threshold
-   - each income tax band's rate (**basis points**: 19% is `1900`) and
-     cumulative taxable limit
    - each NI band's rate and cumulative **gross** limit
+3. Then, for **each jurisdiction** under `jurisdictions`:
+   - each income tax band's rate (**basis points**: 19% is `1900`) and
+     cumulative **taxable** limit
    - `publishedBands` — the official gross table, for display
-3. Set `verifiedOn` and `sources`.
-4. Update `DEFAULT_TAX_YEAR_ID` if this is now the current year.
-5. Run the tests. The structural invariants run over *every* configured year, so
-   a malformed new entry fails CI rather than producing wrong answers.
-6. Mutation-test, cross-check, commit, PR.
+   - that jurisdiction's own `sources`
+4. Set `verifiedOn` and `ukSources`.
+5. Update `DEFAULT_TAX_YEAR_ID` if this is now the current year.
+6. Run the tests. The structural invariants run over *every* configured year and
+   jurisdiction, so a malformed new entry fails CI rather than producing wrong
+   answers.
+7. Mutation-test, cross-check, commit, PR.
+
+> **Do not duplicate the personal allowance or National Insurance per
+> jurisdiction.** They are reserved to Westminster and identical everywhere, so
+> they live on the year itself. A test asserts every jurisdiction resolves to
+> the same values — duplicating them would create two places for one figure to
+> go wrong.
 
 ### Worked example — the 2026/27 Scottish bands
 
