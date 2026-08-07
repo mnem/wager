@@ -376,7 +376,7 @@ a contributor using their own auth.
 No pension contributions or salary sacrifice, no student or postgraduate loans,
 no benefits in kind, no tax code other than the standard one, no marriage or
 blind person's allowance, and no savings or dividend income (taxed at UK-wide
-rates even for Scottish taxpayers).
+rates wherever you live).
 
 National Insurance is calculated annually; real payroll calculates it per pay
 period, so a real payslip can differ slightly. All of this is stated on the page
