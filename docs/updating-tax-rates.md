@@ -51,7 +51,6 @@ Only primary sources. A test enforces that every `sources` URL is on `gov.uk` or
 |---|---|
 | Scottish income tax rates and bands | <https://www.gov.scot/publications/scottish-income-tax-rates-and-bands/> |
 | Personal allowance, NI thresholds and rates | <https://www.gov.uk/guidance/rates-and-thresholds-for-employers-2026-to-2027> (change the year in the URL) |
-| Rest-of-UK income tax rates | <https://www.gov.uk/government/publications/rates-and-allowances-income-tax/income-tax-rates-and-allowances-current-and-past> |
 
 Note the two publish on **different bases**: gov.scot gives gross ranges,
 gov.uk gives taxable ranges already. Read the page's own wording each time
@@ -70,6 +69,10 @@ Use this when a rate was mistyped, or a threshold changed after the fact.
 3. **Update both representations.** `incomeTax.bands[].upToPence` (taxable) and
    the matching `publishedBands[]` entry (gross). They are cross-checked by a
    test, so changing only one fails CI — that is the point of the duplication.
+
+   If the figure is one of the bands in [the worked example](#worked-example--the-202627-scottish-bands)
+   below, update that table too. A CI step checks it against `tax-years.js`, so
+   a stale example fails the build rather than misleading the next reader.
 4. **Update `verifiedOn`** to today's date, in the same commit. Never change a
    figure without doing this.
 5. **Run the tests**, and read [what the failures mean](#what-the-test-failures-mean).
@@ -104,8 +107,15 @@ What gov.scot publishes, and what goes in the file:
 | Basic | 20% | £16,538 – £29,526 | `2000` | `1_695_600` |
 | Intermediate | 21% | £29,527 – £43,662 | `2100` | `3_109_200` |
 | Higher | 42% | £43,663 – £75,000 | `4200` | `6_243_000` |
-| Advanced | 45% | £75,001 – £125,140 | `4500` | `12_514_000` ← **not** `11_257_000` |
+| Advanced | 45% | £75,001 – £125,140 | `4500` | `12_514_000` |
 | Top | 48% | Over £125,140 | `4800` | `Infinity` |
+
+> The advanced row is the one to double-check: **`12_514_000`, not `11_257_000`.**
+> See [the trap](#the-trap-gross-versus-taxable).
+
+This table is checked against `src/lib/tax-years.js` by CI, so it cannot quietly
+go stale — but that check is only as good as the config it compares against, so
+it is not a substitute for reading the source pages.
 
 The arithmetic for each:
 
