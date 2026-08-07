@@ -93,6 +93,7 @@ jobs:
             });
 
             console.log(`Runbook worked example matches tax-years.js across ${rows.length} bands`);
+          '
 
       - name: Guard against the dark palette drifting out of sync
         run: |
