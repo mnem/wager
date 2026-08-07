@@ -9,6 +9,7 @@ import {
   formatGBP,
   formatPercent,
   assertPence,
+  parsePercentInput,
 } from '../src/lib/money.js';
 
 test('parseMoneyInput accepts plain amounts', () => {
@@ -123,4 +124,23 @@ test('assertPence guards non-integer values', () => {
 
 test('PENCE_PER_POUND is the only magic number', () => {
   assert.equal(PENCE_PER_POUND, 100);
+});
+
+test('parsePercentInput converts a typed rate to basis points', () => {
+  assert.equal(parsePercentInput('19'), 1900);
+  assert.equal(parsePercentInput('19%'), 1900);
+  assert.equal(parsePercentInput(' 19.5 % '), 1950);
+  assert.equal(parsePercentInput('0'), 0);
+  assert.equal(parsePercentInput('45.25'), 4525);
+  assert.equal(parsePercentInput(42), 4200);
+});
+
+test('parsePercentInput rejects rates it could not store exactly', () => {
+  // A third decimal place cannot be represented in basis points. Rounding it
+  // silently would apply a rate the person did not type.
+  assert.equal(parsePercentInput('19.555'), null);
+
+  for (const bad of ['', '  ', 'abc', '-19', '19%%', '1,9', '.5', '19.', '1e2', null, undefined, NaN, {}]) {
+    assert.equal(parsePercentInput(bad), null, `expected ${JSON.stringify(bad)} to be rejected`);
+  }
 });
