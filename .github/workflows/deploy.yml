@@ -85,7 +85,11 @@ jobs:
           # deploy with a legible error rather than reach the generator.
           case "$VERSION" in
             '' | *[!A-Za-z0-9._+-]*)
-              echo "::error::Refusing to deploy: version string contains unexpected characters: $VERSION"
+              # Strip newlines before echoing the rejected value: workflow
+              # command parsing is line-based, so a tag containing a newline
+              # could otherwise spoof an extra log line on its way out.
+              SAFE="$(printf '%s' "$VERSION" | tr -d '\n\r' | cut -c1-80)"
+              echo "::error::Refusing to deploy: version string contains unexpected characters: ${SAFE}"
               exit 1
               ;;
           esac
