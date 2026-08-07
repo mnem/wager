@@ -22,12 +22,14 @@
  *
  * - `'exhaustive'` sweeps every penny of the taper. A proof. Used by the tests.
  * - `'sampled'` checks a window around every rate change plus a stride through
- *   the taper. A few milliseconds, and enough to catch any realistic mistake a
- *   person makes by hand. Used by the UI.
+ *   the taper. A few milliseconds. Used by the UI.
  *
- * A sampled pass is not a guarantee. It is a guard against obvious errors, and
- * the code that calls it must still treat a failure from the inversion itself
- * as possible.
+ * A sampled pass is **not a guarantee**, and nothing here should be read as
+ * claiming otherwise. It checks the places a violation is most likely — the
+ * pennies either side of a rate change — and samples the rest. A config it
+ * passes may still be broken somewhere between two samples, so the code that
+ * calls it must treat a failure from the inversion itself as possible rather
+ * than unreachable.
  */
 
 import { computeAnnual } from './calculator.js';
@@ -65,6 +67,12 @@ function bandProblems(scheme, name) {
 
   for (const band of scheme.bands) {
     const label = band?.id ? `${name} band '${band.id}'` : `${name} band`;
+
+    if (typeof band?.label !== 'string' || band.label.trim() === '') {
+      // Not a wrong number, but it renders as a blank row in the breakdown,
+      // which is the same class of "validates and still misbehaves".
+      problems.push(`${label} needs a name, or it shows as a blank row`);
+    }
 
     if (!band?.id) {
       problems.push(`${name} has a band with no id`);
@@ -143,17 +151,20 @@ function rateChangePoints(year) {
   const taperEndsAt = thresholdPence + (allowance * withdraw.per) / withdraw.lose;
 
   const points = new Set([0, allowance, thresholdPence, taperEndsAt]);
-  for (const band of year.nationalInsurance.bands) {
-    if (Number.isFinite(band.upToPence)) points.add(band.upToPence);
+
+  for (const scheme of [year.incomeTax, year.nationalInsurance]) {
+    for (const band of scheme.bands) {
+      if (!Number.isFinite(band.upToPence)) continue;
+
+      // A limit on gross income is already a gross figure. A limit on taxable
+      // income is not: the matching gross is the limit plus whatever allowance
+      // survives — the full allowance below the taper, and nothing above it.
+      // Both are added, since which applies depends where in the taper you are.
+      points.add(band.upToPence);
+      if (scheme.appliesTo === 'taxable') points.add(band.upToPence + allowance);
+    }
   }
-  for (const band of year.incomeTax.bands) {
-    if (!Number.isFinite(band.upToPence)) continue;
-    // Income tax limits are on taxable income; the matching gross is the limit
-    // plus whatever allowance survives — the full allowance below the taper,
-    // and nothing above it.
-    points.add(band.upToPence + allowance);
-    points.add(band.upToPence);
-  }
+
   return [...points];
 }
 

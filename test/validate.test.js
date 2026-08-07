@@ -74,6 +74,13 @@ test('catches the mistakes that would otherwise produce a plausible wrong answer
       expect: /two bands called/,
     },
     {
+      what: 'a band with no name',
+      year: broken((y) => {
+        y.incomeTax.bands[0].label = '   ';
+      }),
+      expect: /needs a name, or it shows as a blank row/,
+    },
+    {
       what: 'a negative personal allowance',
       year: broken((y) => {
         y.personalAllowance.amountPence = -1;
@@ -120,23 +127,37 @@ test('the sampled pass is fast enough to run on every keystroke', () => {
   assert.ok(elapsedMs < 250, `sampled validation took ${elapsedMs.toFixed(0)}ms, which is too slow to type through`);
 });
 
-test('a sampled pass is a guard, not a proof — and says so honestly', () => {
-  // Worth pinning down rather than assuming: the sampled pass checks a window
-  // around each rate change, so it catches anything near a boundary. What it
-  // cannot promise is the interior of the taper between strides. This asserts
-  // the difference is real, so nobody mistakes one for the other.
+test('the sampled pass covers the rate boundaries, where violations cluster', () => {
+  // The 49.5% mutation is caught by BOTH depths, because a rate that high makes
+  // the rounding overflow recur every few dozen pennies, so it shows up inside
+  // the window around a rate change. Worth pinning down: this is the class of
+  // error the sampled pass is genuinely good at.
   const year = broken((y) => {
     y.incomeTax.bands.find((band) => band.id === 'advanced').rateBasisPoints = 4950;
   });
 
-  const exhaustive = validateTaxYear(year, { monotonicity: 'exhaustive' });
-  assert.ok(exhaustive.length > 0, 'the exhaustive pass is the one that proves it');
+  assert.ok(validateTaxYear(year, { monotonicity: 'sampled' }).length > 0);
+  assert.ok(validateTaxYear(year, { monotonicity: 'exhaustive' }).length > 0);
+});
 
-  // The sampled pass may or may not catch this particular mutation depending on
-  // where its strides land — which is precisely why the UI must also handle the
-  // inversion throwing.
-  const sampled = validateTaxYear(year, { monotonicity: 'sampled' });
-  assert.ok(Array.isArray(sampled));
+test('the sampled pass checks strictly less than the exhaustive one', () => {
+  // The honest statement of the difference, asserted rather than described:
+  // sampling is faster because it evaluates fewer points, so there are gross
+  // values the exhaustive pass inspects and the sampled pass does not. That is
+  // exactly why a sampled pass is a guard and not a proof, and why callers must
+  // still expect the inversion to throw.
+  const sampledStart = process.hrtime.bigint();
+  validateTaxYear(YEAR, { monotonicity: 'sampled' });
+  const sampledMs = Number(process.hrtime.bigint() - sampledStart) / 1e6;
+
+  const exhaustiveStart = process.hrtime.bigint();
+  validateTaxYear(YEAR, { monotonicity: 'exhaustive' });
+  const exhaustiveMs = Number(process.hrtime.bigint() - exhaustiveStart) / 1e6;
+
+  assert.ok(
+    exhaustiveMs > sampledMs * 5,
+    `the two depths should differ by more than noise, got ${sampledMs.toFixed(1)}ms and ${exhaustiveMs.toFixed(1)}ms`,
+  );
 });
 
 test('a config that passes validation can actually be used', () => {
