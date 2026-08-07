@@ -25,9 +25,46 @@ test('parseMoneyInput accepts currency symbols, separators and whitespace', () =
   assert.equal(parseMoneyInput('3,214.58'), 321_458);
   assert.equal(parseMoneyInput('£3,214.58'), 321_458);
   assert.equal(parseMoneyInput('  £3,214.58  '), 321_458);
+  assert.equal(parseMoneyInput('£ 1,000'), 100_000, 'a space after the symbol is decoration');
   assert.equal(parseMoneyInput('1,234,567'), 123_456_700);
   assert.equal(parseMoneyInput('3 214.58'), 321_458);
   assert.equal(parseMoneyInput('\u00A03,214.58'), 321_458, 'non-breaking space');
+});
+
+test('a space is a thousands separator, held to the same rule as a comma', () => {
+  // Whitespace used to be stripped unconditionally, so a space meant nothing
+  // and could sit anywhere: "12 34.56" was quietly read as £1,234.56 while the
+  // equivalent "12,3456" was rejected, and "1 2 3" came out as £123. Two
+  // conventions for the same thing, held to different standards.
+  const pairs = [
+    ['1 234 567', '1,234,567'],
+    ['3 214.58', '3,214.58'],
+    ['12 34.56', '12,34.56'],
+    ['1 2 3', '1,2,3'],
+    ['12 3456', '12,3456'],
+    ['1234 567', '1234,567'],
+  ];
+
+  for (const [spaced, commad] of pairs) {
+    assert.equal(
+      parseMoneyInput(spaced),
+      parseMoneyInput(commad),
+      `${JSON.stringify(spaced)} and ${JSON.stringify(commad)} must be treated alike`,
+    );
+  }
+
+  // And the badly grouped ones are rejected rather than reinterpreted.
+  assert.equal(parseMoneyInput('12 34.56'), null);
+  assert.equal(parseMoneyInput('1 2 3'), null);
+
+  // Mixing the two is accepted: the grouping is still unambiguous, so there is
+  // nothing to guess at.
+  assert.equal(parseMoneyInput('1,234 567'), 123_456_700);
+  assert.equal(parseMoneyInput('1 234,567'), 123_456_700);
+
+  // A non-breaking space behaves as an ordinary one, wherever it appears.
+  assert.equal(parseMoneyInput('1\u00A0234\u00A0567'), 123_456_700);
+  assert.equal(parseMoneyInput('12\u00A034.56'), null);
 });
 
 test('parseMoneyInput accepts numbers without floating point drift', () => {
