@@ -62,7 +62,12 @@
         </div>
       </form>
 
-      <section id="result" class="result" aria-live="polite" hidden>
+      <!-- Deliberately NOT a live region. It rewrites on every keystroke, which
+           a screen reader would announce each time. The concise status message
+           below is the live region instead, updated once typing settles. -->
+      <p class="visually-hidden" id="live-status" role="status" aria-live="polite"></p>
+
+      <section id="result" class="result" hidden>
         <p class="result__label">You'd need a gross salary of about</p>
         <p class="result__headline" id="headline-gross"></p>
         <p class="result__sub" id="headline-sub"></p>

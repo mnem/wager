@@ -12,11 +12,15 @@ import { BUILD } from './version.js';
 
 const YEAR = getTaxYear();
 
+/** Long enough to skip mid-word keystrokes, short enough not to feel broken. */
+const ANNOUNCE_DELAY_MS = 600;
+
 const el = {
   form: document.getElementById('calculator'),
   input: document.getElementById('monthly-net'),
   error: document.getElementById('monthly-net-error'),
   result: document.getElementById('result'),
+  liveStatus: document.getElementById('live-status'),
   headline: document.getElementById('headline-gross'),
   headlineSub: document.getElementById('headline-sub'),
   breakdown: document.getElementById('breakdown'),
@@ -216,11 +220,29 @@ function renderBuildInfo() {
 
 /* Interaction -------------------------------------------------------------- */
 
+/**
+ * Announce the outcome to assistive technology, once typing has settled.
+ *
+ * The visible result updates on every keystroke, which is right for sighted
+ * users and wrong for a screen reader — it would announce a partial figure per
+ * character. This is the only live region on the page, it carries a one-line
+ * summary rather than the whole breakdown, and it waits for a pause in typing.
+ */
+let announceTimer = null;
+function announce(message) {
+  clearTimeout(announceTimer);
+  announceTimer = setTimeout(() => {
+    el.liveStatus.textContent = message;
+  }, ANNOUNCE_DELAY_MS);
+}
+
 function clearResult(message) {
   el.result.hidden = true;
   el.breakdown.hidden = true;
   el.error.hidden = !message;
   el.error.textContent = message ?? '';
+  // The error itself is role="alert", so it announces on its own.
+  announce('');
 }
 
 function update() {
@@ -270,6 +292,11 @@ function update() {
 
   el.result.hidden = false;
   el.breakdown.hidden = false;
+
+  announce(
+    `Gross salary ${formatGBP(suggestion.grossPence, { decimals: 0 })} a year, ` +
+      `taking home ${formatGBP(suggestion.monthly.netPence)} a month.`,
+  );
 }
 
 el.form.addEventListener('submit', (event) => event.preventDefault());
