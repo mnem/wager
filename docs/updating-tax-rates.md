@@ -88,7 +88,7 @@ Adding a year is a **data-only change**. If it isn't, something has gone wrong.
 1. Copy the most recent entry in `TAX_YEARS` and change its key, `id`, `label`,
    `startsOn` and `endsOn`.
 2. Work through the **year-level** figures, which are reserved to Westminster
-   and therefore the same everywhere:
+   and therefore the same in every jurisdiction:
    - personal allowance amount and taper threshold
    - each NI band's rate and cumulative **gross** limit
 3. Then, for **each jurisdiction** under `jurisdictions`:
@@ -108,6 +108,12 @@ Adding a year is a **data-only change**. If it isn't, something has gone wrong.
 > they live on the year itself. A test asserts every jurisdiction resolves to
 > the same values — duplicating them would create two places for one figure to
 > go wrong.
+
+> **Check Wales separately each year.** Wales sets its own rates through the
+> Welsh Rates of Income Tax and currently chooses figures identical to England
+> and Northern Ireland, which is the only reason they share an entry. If Wales
+> ever diverges, give it its own entry under `jurisdictions` rather than
+> stretching the shared one.
 
 ### Worked example — the 2026/27 Scottish bands
 
