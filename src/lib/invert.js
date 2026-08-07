@@ -207,7 +207,22 @@ export function salaryForMonthlyNet(monthlyNetPence, year = getTaxYear()) {
     grossPence += POUND;
   }
 
-  // ...then give back every pound that turns out not to be needed.
+  // Exhausting the walk without reaching the target must fail loudly. Falling
+  // through would return a salary that does NOT deliver the requested
+  // take-home pay — the one failure this function must never produce silently.
+  // It should be unreachable: the starting estimate is at most a pound or two
+  // out. But "cannot currently happen" is exactly the case worth asserting,
+  // since a future tax year with a steeper taper could change the margin.
+  if (monthlyNetAt(grossPence) < monthlyNetPence) {
+    throw new RangeError(
+      `Could not find a salary paying £${(monthlyNetPence / 100).toLocaleString('en-GB')} a month ` +
+        `within £${MAX_POUND_WALK} of the estimate. The tax year config may have a steeper taper than this search assumes.`,
+    );
+  }
+
+  // ...then give back every pound that turns out not to be needed. Stopping
+  // early here is harmless — the answer still clears the target, it is just not
+  // the smallest such salary — so this bound needs no equivalent guard.
   while (
     grossPence >= POUND &&
     startedAt - grossPence < MAX_POUND_WALK * POUND &&
