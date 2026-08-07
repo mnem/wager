@@ -62,6 +62,14 @@ test('a space is a thousands separator, held to the same rule as a comma', () =>
   assert.equal(parseMoneyInput('1,234 567'), 123_456_700);
   assert.equal(parseMoneyInput('1 234,567'), 123_456_700);
 
+  // A space touching the decimal point is rejected too. It used to be swallowed,
+  // but the comma equivalent was always rejected — so this is the same rule
+  // reaching a boundary rather than a new restriction, and nobody types it on
+  // purpose.
+  assert.equal(parseMoneyInput('1234 .56'), null);
+  assert.equal(parseMoneyInput('1,234. 56'), null);
+  assert.equal(parseMoneyInput('1234,.56'), null, 'the comma form, rejected before and after');
+
   // A non-breaking space behaves as an ordinary one, wherever it appears.
   assert.equal(parseMoneyInput('1\u00A0234\u00A0567'), 123_456_700);
   assert.equal(parseMoneyInput('12\u00A034.56'), null);
