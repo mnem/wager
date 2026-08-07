@@ -247,6 +247,7 @@ target rather than falling a penny short.
 |---|---|---|
 | `money.js` | `parseMoneyInput`, `formatGBP`, `formatPercent`, `poundsToPence`, `penceToPounds`, `ceilToPound`, `roundHalfUp`, `basisPointsToRate`, `assertPence`, `PENCE_PER_POUND`, `BASIS_POINTS` | The only place pounds exist |
 | `tax-years.js` | `TAX_YEARS`, `DEFAULT_TAX_YEAR_ID`, `DEFAULT_JURISDICTION_ID`, `getTaxYear`, `listTaxYearIds`, `listJurisdictions` | **Data only.** No logic, no `if` about tax |
+| `validate.js` | `validateTaxYear`, `assertValidTaxYear` | The invariants the calculator assumes but does not check |
 | `calculator.js` | `computeAnnual`, `toMonthly`, `personalAllowanceFor`, `applyBands`, `marginalRateAt` | **No tax figures.** Reads them from the config it is given |
 | `invert.js` | `salaryForMonthlyNet`, `grossFromAnnualNet`, `grossFromMonthlyNet` | `salaryForMonthlyNet` is what the UI uses |
 | `app.js` | — | DOM wiring only |
@@ -265,12 +266,25 @@ about two seconds.
 | File | Guards |
 |---|---|
 | `money.test.js` | Parsing, half-up rounding, formatting round-trips |
-| `tax-years.test.js` | Config invariants, published-vs-taxable agreement, **the monotonicity property** |
+| `tax-years.test.js` | Provenance, published-vs-taxable agreement, and `validateTaxYear` run exhaustively |
+| `validate.test.js` | That each invariant catches the wrong answer it exists to prevent |
 | `calculator.test.js` | Known values at every published boundary, the £112,570 regression |
 | `invert.test.js` | Contract edge cases, plateaus, bracket termination |
 | `roundtrip.test.js` | ~2,900 gross values swept: `net(g) >= target` **and** `net(g-1) < target` |
 
 Two deserve special mention.
+
+Those invariants live in `src/lib/validate.js` rather than in the test file, so
+the tests and the UI check the same things. The calculator itself trusts its
+config completely — give it bands out of order and it returns a confident wrong
+number — which was tolerable while every config was committed, and stops being
+tolerable once someone can edit the figures in the browser.
+
+The validator runs at two depths, and the difference is real rather than
+cosmetic. `'exhaustive'` sweeps every penny and is a proof; `'sampled'` checks a
+window around each rate change plus a stride through the taper, and is a guard.
+Measured: **2,057ms against 27ms**. CI proves; the browser guards, and still has
+to handle the inversion throwing.
 
 **The monotonicity guard sweeps the taper exhaustively** — all 2,514,000 pennies
 between £100,000 and £125,140, asserting a penny of gross never costs more than
