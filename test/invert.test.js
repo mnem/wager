@@ -290,3 +290,65 @@ test('ceilToPound leaves whole pounds alone', () => {
   assert.equal(ceilToPound(199), 200);
   assert.equal(ceilToPound(12_000_000), 12_000_000);
 });
+
+test('monthly net never falls across the taper, at whole-pound steps', () => {
+  // The whole-pound search assumes a pound of gross moves monthly net by more
+  // than the one-penny rounding wobble. This is where that assumption is
+  // thinnest: between £100,000 and £125,140 the marginal deduction is 69.5%
+  // (45% advanced rate scaled by the taper, plus 2% NI), so each extra pound
+  // of gross buys only about 2.5p a month.
+  //
+  // Review flagged that the existing target-stepped tests are too coarse to
+  // cover this reliably, so sweep every whole pound of the band.
+  const monthlyNetAt = (gross) => toMonthly(computeAnnual(gross, YEAR)).netPence;
+
+  let previous = monthlyNetAt(p(100_000));
+  let smallestStep = Infinity;
+
+  for (let gross = p(100_000) + 100; gross <= p(125_140); gross += 100) {
+    const current = monthlyNetAt(gross);
+    const step = current - previous;
+    assert.ok(step >= 0, `monthly net fell by ${-step}p going to gross ${gross}`);
+    smallestStep = Math.min(smallestStep, step);
+    previous = current;
+  }
+
+  // Records the actual headroom. If a future config makes this zero, the
+  // whole-pound search is no longer safe and this test says so.
+  assert.ok(smallestStep > 0, `no headroom left: smallest whole-pound step was ${smallestStep}p`);
+});
+
+test('the whole-pound search stays minimal through the taper', () => {
+  const monthlyNetAt = (gross) => toMonthly(computeAnnual(gross, YEAR)).netPence;
+
+  for (let gross = p(100_000); gross <= p(125_140); gross += p(311)) {
+    const target = monthlyNetAt(gross);
+    const { grossPence } = salaryForMonthlyNet(target, YEAR);
+
+    assert.ok(monthlyNetAt(grossPence) >= target, `${grossPence} must clear ${target}`);
+    assert.ok(
+      monthlyNetAt(grossPence - 100) < target,
+      `${grossPence} must be the smallest whole pound clearing ${target}`,
+    );
+  }
+});
+
+test('salaryForMonthlyNet fails loudly rather than returning a short answer', () => {
+  // If the pound-walk is exhausted without reaching the target, returning
+  // anyway would quote a salary that does not pay what was asked for. A tax
+  // year whose deductions swallow almost everything at the margin forces that
+  // path.
+  const steep = structuredClone(YEAR);
+  steep.personalAllowance.amountPence = 0;
+  steep.incomeTax.bands = [
+    { id: 'all', label: 'All', rateBasisPoints: 9_900, upToPence: Infinity },
+  ];
+
+  assert.throws(
+    () => salaryForMonthlyNet(p(5_000), steep),
+    (error) => {
+      assert.ok(error instanceof RangeError, `expected RangeError, got ${error.constructor.name}`);
+      return true;
+    },
+  );
+});
