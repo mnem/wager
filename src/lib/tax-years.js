@@ -19,11 +19,17 @@
  * rather than being duplicated per jurisdiction — duplicating them would create
  * two places for the same figure to go wrong.
  *
- * Wales shares an entry with England and Northern Ireland because the Welsh
- * Government currently sets its rates to exactly match theirs, not because it
- * lacks the power to differ. If Wales ever diverges, it needs its own entry
- * under `jurisdictions` — which is a data-only change, and the reason the shape
- * allows for it.
+ * Wales is listed separately from England and Northern Ireland because its tax
+ * system genuinely is separate — the UK rates are reduced by 10p for Welsh
+ * taxpayers and the Senedd sets a Welsh rate for each band. For 2026/27 it has
+ * set 10p in every band, so the totals match England and Northern Ireland
+ * exactly. That is a fact about this year's rates, not a structural one.
+ *
+ * Rather than copy the figures, the Welsh entry declares `ratesSameAs` and
+ * `getTaxYear` resolves it. One copy of the numbers, but Wales still appears in
+ * its own right — so nobody has to remember that "rest of the UK" quietly meant
+ * three tax systems. When Wales diverges, replace `ratesSameAs` with its own
+ * bands and nothing else changes.
  *
  * `getTaxYear()` flattens a year and a jurisdiction into a single object. That
  * flattened shape is what the calculator consumes, and it is deliberately the
@@ -133,13 +139,10 @@ export const TAX_YEARS = {
         ],
       },
 
-      'rest-of-uk': {
-        id: 'rest-of-uk',
-        label: 'England, Wales & Northern Ireland',
-        appliesTo: 'people whose main home is in England, Wales or Northern Ireland',
-        // Wales sets its own rates through the Welsh Rates of Income Tax and
-        // currently chooses figures identical to England and Northern Ireland.
-        // Split this entry if that ever stops being true.
+      'england-ni': {
+        id: 'england-ni',
+        label: 'England & Northern Ireland',
+        appliesTo: 'people whose main home is in England or Northern Ireland',
         sources: [
           {
             label: 'Income Tax rates and allowances (gov.uk)',
@@ -166,6 +169,35 @@ export const TAX_YEARS = {
           { id: 'higher', fromPence: 5_027_100, toPence: 12_514_000 },
           { id: 'additional', fromPence: 12_514_100, toPence: null },
         ],
+      },
+
+      wales: {
+        id: 'wales',
+        label: 'Wales',
+        appliesTo: 'people whose main home is in Wales',
+        sources: [
+          {
+            label: 'Welsh rates of Income Tax (gov.wales)',
+            url: 'https://www.gov.wales/welsh-rates-income-tax',
+          },
+          {
+            label: 'Income Tax in Wales (gov.uk)',
+            url: 'https://www.gov.uk/welsh-income-tax',
+          },
+        ],
+
+        // Wales sets its own rates: the UK rates are reduced by 10p for Welsh
+        // taxpayers, and the Senedd sets a Welsh rate for each band. For
+        // 2026/27 it set 10p in every band, so the totals come out identical to
+        // England and Northern Ireland.
+        //
+        // Pointing at that entry rather than copying its numbers keeps one
+        // source of truth while still listing Wales in its own right. Replace
+        // this with an `incomeTax` and `publishedBands` of its own the year the
+        // Senedd chooses differently.
+        ratesSameAs: 'england-ni',
+        ratesNote:
+          'Wales sets its own income tax rates. For 2026/27 the Senedd set them to match England and Northern Ireland exactly.',
       },
     },
   },
@@ -201,6 +233,23 @@ export function getTaxYear(yearId = DEFAULT_TAX_YEAR_ID, jurisdictionId = DEFAUL
     );
   }
 
+  // A jurisdiction whose rates currently match another's points at it rather
+  // than duplicating the figures. Only one level of indirection is allowed: a
+  // chain would make it hard to see which numbers actually apply.
+  const rates = jurisdiction.ratesSameAs
+    ? year.jurisdictions[jurisdiction.ratesSameAs]
+    : jurisdiction;
+  if (!rates) {
+    throw new RangeError(
+      `Jurisdiction ${JSON.stringify(jurisdictionId)} points its rates at ${JSON.stringify(jurisdiction.ratesSameAs)}, which does not exist`,
+    );
+  }
+  if (rates.ratesSameAs) {
+    throw new RangeError(
+      `Jurisdiction ${JSON.stringify(jurisdictionId)} points its rates at ${JSON.stringify(jurisdiction.ratesSameAs)}, which points somewhere else again`,
+    );
+  }
+
   return {
     id: year.id,
     label: year.label,
@@ -211,6 +260,9 @@ export function getTaxYear(yearId = DEFAULT_TAX_YEAR_ID, jurisdictionId = DEFAUL
     jurisdictionId: jurisdiction.id,
     jurisdiction: jurisdiction.label,
     appliesTo: jurisdiction.appliesTo,
+    // Present only where a jurisdiction's rates currently match another's, so
+    // the UI can say so rather than leaving it to look like a coincidence.
+    ratesNote: jurisdiction.ratesNote ?? null,
 
     // The jurisdiction's own sources first, then the UK-wide ones, so the most
     // specific reference is the one a reader sees first.
@@ -218,8 +270,8 @@ export function getTaxYear(yearId = DEFAULT_TAX_YEAR_ID, jurisdictionId = DEFAUL
 
     personalAllowance: year.personalAllowance,
     nationalInsurance: year.nationalInsurance,
-    incomeTax: jurisdiction.incomeTax,
-    publishedBands: jurisdiction.publishedBands,
+    incomeTax: rates.incomeTax,
+    publishedBands: rates.publishedBands,
   };
 }
 
