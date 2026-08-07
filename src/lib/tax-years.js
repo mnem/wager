@@ -12,11 +12,18 @@
  *
  * ## What varies by jurisdiction, and what does not
  *
- * Income tax rates and bands are devolved to Scotland, so they live under
+ * Income tax rates and bands are devolved — to Scotland via the Scottish rates,
+ * and to Wales via the Welsh Rates of Income Tax — so they live under
  * `jurisdictions`. The personal allowance and National Insurance are reserved
  * to Westminster and identical everywhere, so they sit on the year itself
  * rather than being duplicated per jurisdiction — duplicating them would create
  * two places for the same figure to go wrong.
+ *
+ * Wales shares an entry with England and Northern Ireland because the Welsh
+ * Government currently sets its rates to exactly match theirs, not because it
+ * lacks the power to differ. If Wales ever diverges, it needs its own entry
+ * under `jurisdictions` — which is a data-only change, and the reason the shape
+ * allows for it.
  *
  * `getTaxYear()` flattens a year and a jurisdiction into a single object. That
  * flattened shape is what the calculator consumes, and it is deliberately the
@@ -130,6 +137,9 @@ export const TAX_YEARS = {
         id: 'rest-of-uk',
         label: 'England, Wales & Northern Ireland',
         appliesTo: 'people whose main home is in England, Wales or Northern Ireland',
+        // Wales sets its own rates through the Welsh Rates of Income Tax and
+        // currently chooses figures identical to England and Northern Ireland.
+        // Split this entry if that ever stops being true.
         sources: [
           {
             label: 'Income Tax rates and allowances (gov.uk)',

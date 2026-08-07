@@ -100,10 +100,16 @@ on the way out. Parsing is done on the *string*, because `1234.56 * 100` is
 
 ### 2. Jurisdictions are a data dimension, invisible to the calculator
 
-Income tax rates and bands are devolved to Scotland; the personal allowance and
-National Insurance are reserved to Westminster and identical everywhere. The
-config mirrors that split exactly: bands live under `jurisdictions`, the
-allowance and NI live on the tax year itself.
+Income tax rates and bands are devolved — to Scotland, and to Wales through the
+Welsh Rates of Income Tax. The personal allowance and National Insurance are
+reserved to Westminster and identical everywhere. The config mirrors that split
+exactly: bands live under `jurisdictions`, the allowance and NI live on the tax
+year itself.
+
+Wales shares an entry with England and Northern Ireland because the Welsh
+Government currently sets rates identical to theirs — not because it cannot
+differ. If it ever does, Wales needs its own entry, which is a data-only
+change.
 
 `getTaxYear(yearId, jurisdictionId)` flattens the two into a single object — and
 that object is deliberately the same shape the file produced before
