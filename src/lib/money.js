@@ -58,6 +58,31 @@ export function basisPointsToRate(basisPoints) {
   return basisPoints / BASIS_POINTS;
 }
 
+/**
+ * Parse a percentage a person typed into integer basis points.
+ *
+ * Accepts an optional trailing %, so "19", "19%" and "19.5%" all work. Rates
+ * are stored as basis points, so 19.5% is 1950 — and anything finer than a
+ * hundredth of a percent is rejected rather than silently rounded, because a
+ * rate that cannot be stored exactly is a rate the calculator would not apply.
+ *
+ * @param {string|number} raw
+ * @returns {number|null} integer basis points, or null if it isn't a valid rate
+ */
+export function parsePercentInput(raw) {
+  if (typeof raw !== 'string' && typeof raw !== 'number') return null;
+  if (typeof raw === 'number' && !Number.isFinite(raw)) return null;
+
+  const cleaned = String(raw).trim().replace(/%$/, '').trim();
+  if (!/^\d+(\.\d+)?$/.test(cleaned)) return null;
+
+  const [whole, fraction = ''] = cleaned.split('.');
+  if (fraction.length > 2) return null;
+
+  const basisPoints = Number(whole) * 100 + Number((fraction + '00').slice(0, 2));
+  return Number.isSafeInteger(basisPoints) ? basisPoints : null;
+}
+
 /** Matches a plain decimal, or one with correctly-grouped thousands separators. */
 const MONEY_SHAPE = /^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.(\d+))?$/;
 
