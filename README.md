@@ -3,8 +3,12 @@
 **What gross salary do I need to take home £X a month?**
 
 A small static web app that works backwards from a monthly net (take-home) wage to
-the equivalent gross annual salary, using **Scottish income tax bands** and UK-wide
-employee **National Insurance**.
+the equivalent gross annual salary, using the **income tax bands where you live**
+and UK-wide employee **National Insurance**.
+
+Covers **Scotland**, **England & Northern Ireland**, and **Wales** — listed
+separately because Wales sets its own rates, even in years like this one where
+it chooses figures identical to England's.
 
 Most salary calculators go gross → net. This one goes the other way — which is what
 you need when you're negotiating against a take-home target.
@@ -14,15 +18,21 @@ you need when you're negotiating against a take-home target.
 ## What it does
 
 - Enter a monthly net wage, get the gross annual salary that produces it
+- Pick the jurisdiction you live in — the bands differ across the UK
 - Full breakdown of the calculation, shown both **per month** and **per year**:
   personal allowance (including the taper above £100,000), every income tax band
   used, National Insurance, total deductions and net pay
 - Effective and marginal deduction rates
+- Light, dark or system colour scheme
+- An escape hatch: if the rates change before this app is updated, you can enter
+  the new figures yourself. The page says loudly when you have, and a reload
+  restores the published ones.
 
 ## Important
 
-This is an **estimate**. It uses Scottish income tax rates and bands, which apply
-to earned income if your main home is in Scotland.
+This is an **estimate**. It uses the income tax rates and bands of whichever
+jurisdiction you select, which apply to earned income based on where your main
+home is.
 
 It deliberately does **not** model pension contributions, salary sacrifice, student
 or postgraduate loans, benefits in kind, non-standard tax codes, the marriage or

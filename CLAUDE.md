@@ -11,9 +11,11 @@ Guidance for Claude Code (and any other contributor) working in this repository.
 Nearly every salary calculator goes gross → net. Wager goes the other way, which is
 what you actually need when negotiating a salary against a take-home target.
 
-It calculates using **Scottish income tax bands** plus **UK-wide employee National
-Insurance**, and presents a full breakdown both per month and per year. It is an
-**estimate**, and the page says so prominently.
+It calculates using the selected jurisdiction's **income tax bands** plus
+**UK-wide employee National Insurance**, and presents a full breakdown both per
+month and per year. Scotland, England & Northern Ireland, and Wales are all
+covered, with Scotland the default. It is an **estimate**, and the page says so
+prominently.
 
 The site is deployed to GitHub Pages from this repository.
 
@@ -86,9 +88,10 @@ in the same commit.
 
 ### Income tax bands are stored on a *taxable* basis
 
-gov.scot publishes Scottish bands as ranges of **gross** income. The config stores
-them as cumulative limits on **taxable** income (gross minus the personal
-allowance). The advanced-rate cumulative limit is **£125,140**, not £112,570 — at
+gov.scot publishes Scottish bands as ranges of **gross** income, while gov.uk
+publishes the rest-of-UK bands as **taxable** income already. The config stores
+cumulative limits on **taxable** income (gross minus the personal allowance), so
+read each source's own wording rather than assuming. The advanced-rate cumulative limit is **£125,140**, not £112,570 — at
 that gross the personal allowance has tapered to zero, so taxable equals gross.
 Getting this wrong silently pushes people into the 48% band from about £112.5k.
 `test/calculator.test.js` asserts every published gross boundary falls out of the
@@ -193,5 +196,7 @@ src/lib/money.js        pence <-> pounds, parsing, GBP formatting
 src/lib/tax-years.js    declarative tax data — no logic
 src/lib/calculator.js   gross -> net, with a full breakdown
 src/lib/invert.js       net -> gross, by bisection
+src/lib/validate.js     the invariants the calculator assumes but does not check
+src/lib/editable.js     published gross figures <-> stored taxable config
 test/*.test.js          node --test
 ```
