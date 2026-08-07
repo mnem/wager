@@ -15,6 +15,8 @@
   --warn-line: #e8d5a3;
   --warn-ink: #6b4f13;
   --deduction: #96331f;
+  --band: #0000000a;
+  --band-hover: #00000014;
 
   --radius: 10px;
   --measure: 44rem;
@@ -48,6 +50,8 @@
     --warn-line: #574823;
     --warn-ink: #e8cf95;
     --deduction: #f0a08c;
+    --band: #ffffff08;
+    --band-hover: #ffffff12;
     /* dark-palette:end */
   }
 }
@@ -66,6 +70,8 @@
   --warn-line: #574823;
   --warn-ink: #e8cf95;
   --deduction: #f0a08c;
+  --band: #ffffff08;
+  --band-hover: #ffffff12;
   /* dark-palette:end */
 }
 
@@ -767,4 +773,24 @@ tbody tr.is-total td.numeric:first-of-type {
 .editor-unbounded {
   color: var(--ink-faint);
   font-style: italic;
+}
+
+/* Row banding ---------------------------------------------------------------
+
+   The breakdown tables are wide and every row is a number, so the eye loses its
+   place tracking from a label on the left to an amount on the right. A very low
+   contrast tint is enough to guide it without competing with the figures.
+
+   Applied to the data rows only. Subtotal and total rows carry their own
+   emphasis, and banding underneath would fight it. */
+
+.table-card tbody tr:nth-child(even of :not(.is-subtotal):not(.is-total)),
+#table-bands tbody tr:nth-child(even),
+.editor__table tbody tr:nth-child(even) {
+  background: var(--band);
+}
+
+.table-card tbody tr:hover,
+#table-bands tbody tr:hover {
+  background: var(--band-hover);
 }
