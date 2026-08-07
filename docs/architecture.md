@@ -73,7 +73,7 @@ sequenceDiagram
     A-->>U: £41,050 and two breakdown tables
 ```
 
-## The five decisions that shape everything
+## The six decisions that shape everything
 
 ### 1. Money is integer pence; rates are integer basis points
 
@@ -98,7 +98,24 @@ Pounds exist only at the two edges: `parseMoneyInput` on the way in, `formatGBP`
 on the way out. Parsing is done on the *string*, because `1234.56 * 100` is
 `123455.99999999999`.
 
-### 2. Income tax bands are stored on a *taxable* basis
+### 2. Jurisdictions are a data dimension, invisible to the calculator
+
+Income tax rates and bands are devolved to Scotland; the personal allowance and
+National Insurance are reserved to Westminster and identical everywhere. The
+config mirrors that split exactly: bands live under `jurisdictions`, the
+allowance and NI live on the tax year itself.
+
+`getTaxYear(yearId, jurisdictionId)` flattens the two into a single object — and
+that object is deliberately the same shape the file produced before
+jurisdictions existed. **`calculator.js` and `invert.js` never learn that
+jurisdictions exist**, and needed no changes when they were added.
+
+Storing the allowance and NI once rather than per jurisdiction is not tidiness:
+duplicating them would create two places for the same figure to go wrong, with
+nothing to say which was right. A test asserts every jurisdiction resolves to
+identical values for both.
+
+### 3. Income tax bands are stored on a *taxable* basis
 
 This is the single easiest thing to get wrong, so it has its own section in
 [updating-tax-rates.md](updating-tax-rates.md).
@@ -117,7 +134,7 @@ their figures exactly by injecting the error.
 National Insurance ignores the allowance entirely, so its bands are cumulative
 limits on **gross** income. Each scheme declares its own `appliesTo`.
 
-### 3. The combined deduction is rounded once, then shared out
+### 4. The combined deduction is rounded once, then shared out
 
 Rounding each band's charge separately breaks monotonicity. A real example:
 
@@ -144,7 +161,7 @@ This is *not* fixable by rounding the income-tax subtotal and the NI subtotal
 separately. Any two independent roundings can cross their boundaries on the same
 penny. Exactly one rounding is the minimum that works.
 
-### 4. Net → gross is bisection, with an explicit contract
+### 5. Net → gross is bisection, with an explicit contract
 
 > `grossFromAnnualNet(target)` returns **the smallest integer gross whose net is
 > at least the target**.
@@ -187,7 +204,7 @@ Both are covered by `test/invert.test.js` — *finds answers right up to the
 ceiling* and *rejects unreachable targets clearly, never with an overflow*. If
 you simplify that clamping, those tests are what will tell you.
 
-### 5. The *monthly* search works in whole pounds
+### 6. The *monthly* search works in whole pounds
 
 Two separate traps here, both found by running the real page rather than by
 tests.
@@ -223,7 +240,7 @@ target rather than falling a penny short.
 | Module | Exports | Notes |
 |---|---|---|
 | `money.js` | `parseMoneyInput`, `formatGBP`, `formatPercent`, `poundsToPence`, `penceToPounds`, `ceilToPound`, `roundHalfUp`, `basisPointsToRate`, `assertPence`, `PENCE_PER_POUND`, `BASIS_POINTS` | The only place pounds exist |
-| `tax-years.js` | `TAX_YEARS`, `DEFAULT_TAX_YEAR_ID`, `getTaxYear`, `listTaxYearIds` | **Data only.** No logic, no `if` about tax |
+| `tax-years.js` | `TAX_YEARS`, `DEFAULT_TAX_YEAR_ID`, `DEFAULT_JURISDICTION_ID`, `getTaxYear`, `listTaxYearIds`, `listJurisdictions` | **Data only.** No logic, no `if` about tax |
 | `calculator.js` | `computeAnnual`, `toMonthly`, `personalAllowanceFor`, `applyBands`, `marginalRateAt` | **No tax figures.** Reads them from the config it is given |
 | `invert.js` | `salaryForMonthlyNet`, `grossFromAnnualNet`, `grossFromMonthlyNet` | `salaryForMonthlyNet` is what the UI uses |
 | `app.js` | — | DOM wiring only |
