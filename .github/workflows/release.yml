@@ -77,6 +77,16 @@ jobs:
           set -euo pipefail
 
           # Rejects leading zeros, which SemVer disallows.
+          #
+          # This pattern's character set — digits, dot, hyphen, and letters in
+          # the prerelease part — must stay a SUBSET of the allowlist in
+          # deploy.yml's "Generate build metadata" step ([A-Za-z0-9._+-]).
+          # That allowlist exists to stop a tag name injecting JavaScript into
+          # the deployed page, and it rejects the whole deploy if it trips. The
+          # containment is currently true by accident rather than by
+          # construction: the two patterns were written for unrelated reasons.
+          # If you widen this one, check that one, or a release will tag
+          # successfully and then fail to deploy.
           SEMVER='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.]+)?$'
 
           LAST_TAG="$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
