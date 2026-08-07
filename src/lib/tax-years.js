@@ -2,20 +2,34 @@
  * Tax year data.
  *
  * This file is DATA ONLY. No calculation logic belongs here, and no tax figure
- * belongs anywhere else — see CLAUDE.md. Adding a future tax year must be a
- * change to this file alone.
+ * belongs anywhere else — see CLAUDE.md. Adding a future tax year, or another
+ * jurisdiction, must be a change to this file alone.
  *
  * Every figure below was checked against the `sources` links on `verifiedOn`.
  * If you change a figure, re-check the primary source and update `verifiedOn`
  * in the same commit. Both fields are rendered in the UI so that staleness is
  * visible rather than assumed.
  *
+ * ## What varies by jurisdiction, and what does not
+ *
+ * Income tax rates and bands are devolved to Scotland, so they live under
+ * `jurisdictions`. The personal allowance and National Insurance are reserved
+ * to Westminster and identical everywhere, so they sit on the year itself
+ * rather than being duplicated per jurisdiction — duplicating them would create
+ * two places for the same figure to go wrong.
+ *
+ * `getTaxYear()` flattens a year and a jurisdiction into a single object. That
+ * flattened shape is what the calculator consumes, and it is deliberately the
+ * same shape this file used before jurisdictions existed, so no calculation
+ * code needed to change.
+ *
  * ## Two different bases
  *
  * Income tax bands are cumulative limits on TAXABLE income — gross minus the
- * personal allowance. gov.scot publishes them as ranges of gross income, so
- * `publishedBands` below carries the official gross table verbatim for display,
- * and the tests assert the two representations agree.
+ * personal allowance. The two governments publish differently: gov.scot gives
+ * ranges of gross income, gov.uk gives taxable income directly. `publishedBands`
+ * carries each one's official table as GROSS ranges for display, and the tests
+ * assert it agrees with the taxable limits.
  *
  * National Insurance ignores the personal allowance entirely, so its bands are
  * cumulative limits on GROSS income.
@@ -36,13 +50,10 @@ export const TAX_YEARS = {
     label: '2026/27',
     startsOn: '2026-04-06',
     endsOn: '2027-04-05',
-    jurisdiction: 'Scotland',
-    verifiedOn: '2026-08-05',
-    sources: [
-      {
-        label: 'Scottish Income Tax rates and bands 2026-27 (gov.scot)',
-        url: 'https://www.gov.scot/publications/scottish-income-tax-rates-and-bands/pages/2026-to-2027/',
-      },
+    verifiedOn: '2026-08-07',
+
+    /** Reserved to Westminster, so the same in every jurisdiction. */
+    ukSources: [
       {
         label: 'Rates and thresholds for employers 2026 to 2027 (gov.uk)',
         url: 'https://www.gov.uk/guidance/rates-and-thresholds-for-employers-2026-to-2027',
@@ -53,29 +64,13 @@ export const TAX_YEARS = {
       // £12,570
       amountPence: 1_257_000,
       // Reduced by £1 for every £2 of income over £100,000, so it reaches zero
-      // at £125,140 — which is exactly where the top rate begins. Expressed as
-      // a whole-number ratio rather than 0.5 so the taper stays exact integer
-      // arithmetic.
+      // at £125,140 — which is exactly where the highest band begins, in both
+      // jurisdictions. Expressed as a whole-number ratio rather than 0.5 so the
+      // taper stays exact integer arithmetic.
       taper: {
         thresholdPence: 10_000_000,
         withdraw: { lose: 1, per: 2 },
       },
-    },
-
-    incomeTax: {
-      appliesTo: 'taxable',
-      bands: [
-        { id: 'starter', label: 'Starter rate', rateBasisPoints: 1900, upToPence: 396_700 },
-        { id: 'basic', label: 'Basic rate', rateBasisPoints: 2000, upToPence: 1_695_600 },
-        { id: 'intermediate', label: 'Intermediate rate', rateBasisPoints: 2100, upToPence: 3_109_200 },
-        { id: 'higher', label: 'Higher rate', rateBasisPoints: 4200, upToPence: 6_243_000 },
-        // £125,140 of taxable income, NOT £112,570. By this point the personal
-        // allowance has tapered fully away, so taxable income equals gross
-        // income. Using £112,570 here would silently push people into the 48%
-        // band from about £112.5k of gross.
-        { id: 'advanced', label: 'Advanced rate', rateBasisPoints: 4500, upToPence: 12_514_000 },
-        { id: 'top', label: 'Top rate', rateBasisPoints: 4800, upToPence: NO_UPPER_LIMIT },
-      ],
     },
 
     nationalInsurance: {
@@ -90,39 +85,132 @@ export const TAX_YEARS = {
       ],
     },
 
-    /**
-     * The official gov.scot table, as GROSS ranges, for display only. This
-     * duplicates the information in `incomeTax.bands` on purpose: the tests
-     * assert the two agree, which is what catches a mistyped threshold.
-     *
-     * `toPence` is the last whole pound of the band; null means unbounded.
-     */
-    publishedBands: [
-      { id: 'starter', fromPence: 1_257_100, toPence: 1_653_700 },
-      { id: 'basic', fromPence: 1_653_800, toPence: 2_952_600 },
-      { id: 'intermediate', fromPence: 2_952_700, toPence: 4_366_200 },
-      { id: 'higher', fromPence: 4_366_300, toPence: 7_500_000 },
-      { id: 'advanced', fromPence: 7_500_100, toPence: 12_514_000 },
-      { id: 'top', fromPence: 12_514_100, toPence: null },
-    ],
+    jurisdictions: {
+      scotland: {
+        id: 'scotland',
+        label: 'Scotland',
+        // Shown on the page so someone can check they are in the right one.
+        appliesTo: 'people whose main home is in Scotland',
+        sources: [
+          {
+            label: 'Scottish Income Tax rates and bands 2026-27 (gov.scot)',
+            url: 'https://www.gov.scot/publications/scottish-income-tax-rates-and-bands/pages/2026-to-2027/',
+          },
+        ],
+
+        incomeTax: {
+          appliesTo: 'taxable',
+          bands: [
+            { id: 'starter', label: 'Starter rate', rateBasisPoints: 1900, upToPence: 396_700 },
+            { id: 'basic', label: 'Basic rate', rateBasisPoints: 2000, upToPence: 1_695_600 },
+            { id: 'intermediate', label: 'Intermediate rate', rateBasisPoints: 2100, upToPence: 3_109_200 },
+            { id: 'higher', label: 'Higher rate', rateBasisPoints: 4200, upToPence: 6_243_000 },
+            // £125,140 of taxable income, NOT £112,570. By this point the
+            // personal allowance has tapered fully away, so taxable income
+            // equals gross income. Using £112,570 here would silently push
+            // people into the 48% band from about £112.5k of gross.
+            { id: 'advanced', label: 'Advanced rate', rateBasisPoints: 4500, upToPence: 12_514_000 },
+            { id: 'top', label: 'Top rate', rateBasisPoints: 4800, upToPence: NO_UPPER_LIMIT },
+          ],
+        },
+
+        // gov.scot publishes GROSS ranges, so this is a transcription of its
+        // table. The tests assert it agrees with the taxable limits above.
+        publishedBands: [
+          { id: 'starter', fromPence: 1_257_100, toPence: 1_653_700 },
+          { id: 'basic', fromPence: 1_653_800, toPence: 2_952_600 },
+          { id: 'intermediate', fromPence: 2_952_700, toPence: 4_366_200 },
+          { id: 'higher', fromPence: 4_366_300, toPence: 7_500_000 },
+          { id: 'advanced', fromPence: 7_500_100, toPence: 12_514_000 },
+          { id: 'top', fromPence: 12_514_100, toPence: null },
+        ],
+      },
+
+      'rest-of-uk': {
+        id: 'rest-of-uk',
+        label: 'England, Wales & Northern Ireland',
+        appliesTo: 'people whose main home is in England, Wales or Northern Ireland',
+        sources: [
+          {
+            label: 'Income Tax rates and allowances (gov.uk)',
+            url: 'https://www.gov.uk/government/publications/rates-and-allowances-income-tax/income-tax-rates-and-allowances-current-and-past',
+          },
+        ],
+
+        incomeTax: {
+          appliesTo: 'taxable',
+          // gov.uk publishes these as taxable income already, so unlike the
+          // Scottish figures these need no conversion — £37,700 is the number
+          // printed on the page.
+          bands: [
+            { id: 'basic', label: 'Basic rate', rateBasisPoints: 2000, upToPence: 3_770_000 },
+            { id: 'higher', label: 'Higher rate', rateBasisPoints: 4000, upToPence: 12_514_000 },
+            { id: 'additional', label: 'Additional rate', rateBasisPoints: 4500, upToPence: NO_UPPER_LIMIT },
+          ],
+        },
+
+        // Derived from the taxable bands for display, since gov.uk does not
+        // publish a gross table. The tests check the two agree either way.
+        publishedBands: [
+          { id: 'basic', fromPence: 1_257_100, toPence: 5_027_000 },
+          { id: 'higher', fromPence: 5_027_100, toPence: 12_514_000 },
+          { id: 'additional', fromPence: 12_514_100, toPence: null },
+        ],
+      },
+    },
   },
 };
 
 export const DEFAULT_TAX_YEAR_ID = '2026-27';
+export const DEFAULT_JURISDICTION_ID = 'scotland';
 
 /**
- * Look up a tax year by id.
+ * Look up a tax year for a jurisdiction, flattened into the shape the
+ * calculator consumes.
  *
- * @param {string} [id]
- * @returns {object} the tax year config
- * @throws {RangeError} if the id is not configured
+ * The flattening is the point: `calculator.js` and `invert.js` never learn that
+ * jurisdictions exist. They receive the same object shape they always have.
+ *
+ * @param {string} [yearId]
+ * @param {string} [jurisdictionId]
+ * @returns {object} the resolved tax year config
+ * @throws {RangeError} if either id is not configured
  */
-export function getTaxYear(id = DEFAULT_TAX_YEAR_ID) {
-  const year = TAX_YEARS[id];
+export function getTaxYear(yearId = DEFAULT_TAX_YEAR_ID, jurisdictionId = DEFAULT_JURISDICTION_ID) {
+  const year = TAX_YEARS[yearId];
   if (!year) {
-    throw new RangeError(`Unknown tax year: ${JSON.stringify(id)}. Known: ${listTaxYearIds().join(', ')}`);
+    throw new RangeError(
+      `Unknown tax year: ${JSON.stringify(yearId)}. Known: ${listTaxYearIds().join(', ')}`,
+    );
   }
-  return year;
+
+  const jurisdiction = year.jurisdictions[jurisdictionId];
+  if (!jurisdiction) {
+    throw new RangeError(
+      `Unknown jurisdiction: ${JSON.stringify(jurisdictionId)}. Known: ${Object.keys(year.jurisdictions).join(', ')}`,
+    );
+  }
+
+  return {
+    id: year.id,
+    label: year.label,
+    startsOn: year.startsOn,
+    endsOn: year.endsOn,
+    verifiedOn: year.verifiedOn,
+
+    jurisdictionId: jurisdiction.id,
+    jurisdiction: jurisdiction.label,
+    appliesTo: jurisdiction.appliesTo,
+
+    // The jurisdiction's own sources first, then the UK-wide ones, so the most
+    // specific reference is the one a reader sees first.
+    sources: [...jurisdiction.sources, ...year.ukSources],
+
+    personalAllowance: year.personalAllowance,
+    nationalInsurance: year.nationalInsurance,
+    incomeTax: jurisdiction.incomeTax,
+    publishedBands: jurisdiction.publishedBands,
+  };
 }
 
 /**
@@ -132,4 +220,18 @@ export function getTaxYear(id = DEFAULT_TAX_YEAR_ID) {
  */
 export function listTaxYearIds() {
   return Object.keys(TAX_YEARS).sort().reverse();
+}
+
+/**
+ * The jurisdictions available for a tax year, in display order.
+ *
+ * @param {string} [yearId]
+ * @returns {Array<{id: string, label: string}>}
+ */
+export function listJurisdictions(yearId = DEFAULT_TAX_YEAR_ID) {
+  const year = TAX_YEARS[yearId];
+  if (!year) {
+    throw new RangeError(`Unknown tax year: ${JSON.stringify(yearId)}`);
+  }
+  return Object.values(year.jurisdictions).map(({ id, label }) => ({ id, label }));
 }
