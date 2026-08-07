@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { toEditable, fromEditable, isUnchanged } from '../src/lib/editable.js';
 import { getTaxYear, listJurisdictions } from '../src/lib/tax-years.js';
 import { validateTaxYear } from '../src/lib/validate.js';
-import { computeAnnual } from '../src/lib/calculator.js';
+import { computeAnnual, personalAllowanceFor } from '../src/lib/calculator.js';
 
 const p = (pounds) => Math.round(pounds * 100);
 
@@ -88,10 +88,23 @@ test('a raised allowance moves the taxable limits with it', () => {
   assert.ok(computeAnnual(p(30_000), rebuilt).netPence > computeAnnual(p(30_000), year).netPence);
 });
 
-test('a raised allowance also moves where it runs out', () => {
-  // Easy to get wrong: the point the allowance is exhausted depends on the
-  // allowance, so raising it pushes that point up too, and the top band's
-  // conversion has to follow.
+test('a band limit inside the taper uses the allowance that survives there', () => {
+  // The case that caught out an earlier version of this module, and the reason
+  // it now delegates to personalAllowanceFor instead of re-deriving the taper.
+  //
+  // Raising the allowance to £20,000 moves the point it runs out from £125,140
+  // to £140,000 — which pulls the advanced band's £125,140 boundary INSIDE the
+  // taper. Inside it, neither shortcut applies: the allowance is neither whole
+  // nor gone, it is partial.
+  //
+  //   over threshold  = 125,140 - 100,000 = 25,140
+  //   withdrawn       = floor(25,140 / 2)  = 12,570
+  //   allowance left  = 20,000 - 12,570    =  7,430
+  //   taxable         = 125,140 - 7,430    = 117,710
+  //
+  // The old two-branch version subtracted the whole £20,000 and produced
+  // £105,140 — out by the entire allowance, which would have moved the top rate
+  // roughly £8,400 of gross income lower than the figure the user typed.
   const year = getTaxYear('2026-27', 'scotland');
   const editable = toEditable(year);
   editable.allowancePence = p(20_000);
@@ -99,10 +112,36 @@ test('a raised allowance also moves where it runs out', () => {
   const rebuilt = fromEditable(editable, year);
   const byId = Object.fromEntries(rebuilt.incomeTax.bands.map((band) => [band.id, band]));
 
-  // The allowance now runs out at £100,000 + £40,000 = £140,000, so £125,140 of
-  // gross is BELOW that point and must have the allowance subtracted — the
-  // opposite of the unedited case.
-  assert.equal(byId.advanced.upToPence, p(125_140) - p(20_000));
+  assert.equal(byId.advanced.upToPence, p(117_710));
+  assert.notEqual(byId.advanced.upToPence, p(125_140) - p(20_000));
+
+  // Bands below the taper are unaffected, so the fix is not a blanket change.
+  assert.equal(byId.starter.upToPence, p(16_537) - p(20_000) < 0 ? 0 : p(16_537) - p(20_000));
+});
+
+test('the conversion agrees with the calculator at every band boundary', () => {
+  // The general statement of the above: whatever allowance the calculator says
+  // applies at a given gross income is the allowance the conversion subtracts.
+  // Asserted across allowances that put boundaries below, inside and above the
+  // taper, so no single shortcut could pass.
+  const year = getTaxYear('2026-27', 'scotland');
+
+  for (const allowance of [p(0), p(12_570), p(15_000), p(20_000), p(30_000)]) {
+    const editable = toEditable(year);
+    editable.allowancePence = allowance;
+    const rebuilt = fromEditable(editable, year);
+
+    rebuilt.incomeTax.bands.forEach((band, index) => {
+      if (!Number.isFinite(band.upToPence)) return;
+      const grossLimit = editable.incomeTax[index].toPence;
+      const surviving = personalAllowanceFor(grossLimit, rebuilt).allowancePence;
+      assert.equal(
+        band.upToPence,
+        Math.max(0, grossLimit - surviving),
+        `allowance ${allowance}, band ${band.id}`,
+      );
+    });
+  }
 });
 
 test('an edited year is marked as edited and stops claiming verification', () => {
