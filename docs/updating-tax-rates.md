@@ -44,8 +44,8 @@ income**. The advanced-rate cumulative limit is therefore **£125,140**, not
 
 ## Where the figures come from
 
-Only primary sources. A test enforces that every `sources` URL is on `gov.uk` or
-`gov.scot`.
+Only primary sources. A test enforces that every `sources` URL is on `gov.uk`,
+`gov.scot` or `gov.wales`.
 
 | What | Where |
 |---|---|
@@ -237,7 +237,7 @@ right from the primary source.
 
 ## Checklist before opening the PR
 
-- [ ] Every figure read off a `gov.uk` or `gov.scot` page, today
+- [ ] Every figure read off a `gov.uk`, `gov.scot` or `gov.wales` page, today
 - [ ] Gross → taxable conversion done, and the advanced limit is the point where
       the allowance hits zero
 - [ ] `incomeTax.bands` **and** `publishedBands` both updated

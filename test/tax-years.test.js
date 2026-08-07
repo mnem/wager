@@ -20,9 +20,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
  * to the same figures, which is the claim that matters.
  */
 const mirrorsAnother = (year) =>
-  Object.values(TAX_YEARS[year.id].jurisdictions).some(
-    (candidate) => candidate.id === year.jurisdictionId && Boolean(candidate.ratesSameAs),
-  );
+  Boolean(TAX_YEARS[year.id].jurisdictions[year.jurisdictionId]?.ratesSameAs);
 
 /**
  * Every (tax year, jurisdiction) pair, resolved through `getTaxYear` — which is

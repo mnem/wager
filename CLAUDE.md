@@ -78,7 +78,7 @@ change.
 Every tax year entry carries:
 
 - `verifiedOn` — the date the figures were last checked against primary sources
-- `sources` — links to gov.scot / gov.uk pages the figures came from
+- `sources` — links to the gov.scot / gov.uk / gov.wales pages the figures came from
 
 Both are rendered in the UI so staleness is visible rather than assumed. When you
 change any figure, re-verify against the primary source and update `verifiedOn`
