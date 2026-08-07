@@ -19,7 +19,29 @@
     <a class="skip-link" href="#result">Skip to result</a>
 
     <header class="masthead">
-      <h1>Wager</h1>
+      <div class="masthead__top">
+        <h1>Wager</h1>
+
+        <!-- Radios rather than a toggle button: three mutually exclusive
+             choices, one of which is "follow the system". A button cycling
+             through three states gives no way to see which is active. -->
+        <fieldset class="theme" id="theme">
+          <legend class="visually-hidden">Colour scheme</legend>
+          <label class="theme__option">
+            <input type="radio" name="theme" value="light" />
+            <span>Light</span>
+          </label>
+          <label class="theme__option">
+            <input type="radio" name="theme" value="system" checked />
+            <span>System</span>
+          </label>
+          <label class="theme__option">
+            <input type="radio" name="theme" value="dark" />
+            <span>Dark</span>
+          </label>
+        </fieldset>
+      </div>
+
       <p class="tagline">
         You know what you want to take home. This works out the salary you need to ask for.
       </p>
@@ -183,7 +205,7 @@
       <p>
         <a href="https://github.com/mnem/wager">Wager</a> is open source under the MIT licence.
         No cookies, no analytics, no data leaves your browser — the calculation runs entirely on
-        this page.
+        this page. The only thing kept between visits is your colour scheme choice.
       </p>
       <p class="build" id="build-info"></p>
     </footer>
