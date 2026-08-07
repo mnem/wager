@@ -93,6 +93,31 @@ jobs:
             });
 
             console.log(`Runbook worked example matches tax-years.js across ${rows.length} bands`);
+
+      - name: Guard against the dark palette drifting out of sync
+        run: |
+          # The dark palette is declared twice — once inside the
+          # prefers-color-scheme media query, once for an explicit choice —
+          # because a rule inside a media query cannot be merged with one
+          # outside it. Changing one and not the other would give people
+          # different colours depending on how they arrived at dark mode.
+          COUNT="$(grep -c 'dark-palette:start' src/styles.css || true)"
+          if [ "$COUNT" != "2" ]; then
+            echo "::error::Expected exactly 2 dark-palette blocks in src/styles.css, found ${COUNT}"
+            exit 1
+          fi
+
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const css = readFileSync("src/styles.css", "utf8");
+            const blocks = [...css.matchAll(/dark-palette:start\s*\*\/([\s\S]*?)\/\*\s*dark-palette:end/g)]
+              .map((match) => match[1].replace(/\s+/g, " ").trim());
+            if (blocks.length !== 2) throw new Error(`expected 2 blocks, parsed ${blocks.length}`);
+            if (blocks[0] !== blocks[1]) {
+              throw new Error("The two dark-palette blocks in src/styles.css have drifted apart:\n" +
+                `  media query: ${blocks[0]}\n  data-theme:  ${blocks[1]}`);
+            }
+            console.log("dark palette blocks match");
           '
 
       - name: Guard against runtime dependencies
