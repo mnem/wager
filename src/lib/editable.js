@@ -13,17 +13,19 @@
  * published tables, and the page itself, show ranges of gross income. So the
  * editable form is gross, and this module converts.
  *
- * The conversion is the same rule the tests use to check the two
- * representations agree: subtract the personal allowance, except above the
- * point the taper has removed it entirely, where taxable income equals gross.
- * Getting this backwards is the £112,570 mistake, so it is derived here once
- * rather than left to whoever builds a form.
+ * The conversion subtracts whatever personal allowance actually survives at
+ * that income — which is the full allowance below the taper, none above it, and
+ * a partial amount inside it. It delegates to `personalAllowanceFor` rather
+ * than restating the rule, because a second copy of the taper is exactly how
+ * the two get out of step. Getting this wrong is the £112,570 mistake, so it is
+ * read from one place rather than left to whoever builds a form.
  *
  * National Insurance is already charged on gross income, so its limits pass
  * through untouched.
  */
 
 import { assertPence } from './money.js';
+import { personalAllowanceFor } from './calculator.js';
 
 /**
  * @typedef {object} EditableBand
@@ -41,18 +43,6 @@ import { assertPence } from './money.js';
  * @property {EditableBand[]} incomeTax
  * @property {EditableBand[]} nationalInsurance
  */
-
-/**
- * The gross income at which the personal allowance has been withdrawn entirely.
- *
- * @param {number} allowancePence
- * @param {number} taperThresholdPence
- * @param {{lose: number, per: number}} withdraw
- * @returns {number}
- */
-function allowanceExhaustedAt(allowancePence, taperThresholdPence, withdraw) {
-  return taperThresholdPence + (allowancePence * withdraw.per) / withdraw.lose;
-}
 
 /**
  * Present a resolved tax year as editable, gross-denominated fields.
@@ -102,21 +92,37 @@ export function fromEditable(editable, template) {
   assertPence(editable.allowancePence);
   assertPence(editable.taperThresholdPence);
 
-  const exhaustedAt = allowanceExhaustedAt(
-    editable.allowancePence,
-    editable.taperThresholdPence,
-    editable.withdraw,
-  );
+  // Shaped so personalAllowanceFor can read it, since that is the only place
+  // the taper is implemented.
+  const taperOnly = {
+    personalAllowance: {
+      amountPence: editable.allowancePence,
+      taper: {
+        thresholdPence: editable.taperThresholdPence,
+        withdraw: editable.withdraw,
+      },
+    },
+  };
 
   /**
    * Gross to taxable, for one limit.
    *
-   * Above the point the allowance is gone, taxable income equals gross income —
-   * which is why the highest bands' limits are not reduced. Subtracting the
-   * allowance there is the mistake that starts the top rate too early.
+   * Delegates to the calculator's own taper rather than re-deriving it. An
+   * earlier version used a two-branch shortcut — subtract the whole allowance
+   * below the point it runs out, subtract nothing above — which is right only
+   * for limits outside the taper window. A limit *inside* it needs the partial
+   * allowance that survives at that income, and the shortcut was out by the
+   * whole allowance there.
+   *
+   * That never showed up on the shipped figures, because every band boundary
+   * sits well below the taper or exactly at its end. It appeared the moment
+   * someone raised the allowance — which moves the end of the taper up and
+   * pulls the top band's boundary inside it. Precisely the case this module
+   * exists to make safe, so the taper is now read from one place rather than
+   * expressed twice and kept in step by hand.
    */
   const toTaxable = (grossPence) =>
-    grossPence >= exhaustedAt ? grossPence : Math.max(0, grossPence - editable.allowancePence);
+    Math.max(0, grossPence - personalAllowanceFor(grossPence, taperOnly).allowancePence);
 
   const bands = (list, convert) =>
     list.map((band, index) => ({
