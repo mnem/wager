@@ -50,6 +50,51 @@ jobs:
           fi
           echo "No email-shaped strings under src/"
 
+      - name: Guard against the tax-rate runbook drifting from the config
+        run: |
+          # docs/updating-tax-rates.md restates the 2026/27 bands as a worked
+          # example, because showing the derivation teaches the gross-to-taxable
+          # conversion far better than prose does. That makes it a second copy
+          # of the most dangerous data in the repo, so it is checked rather than
+          # trusted to be kept in step by hand.
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            import { getTaxYear } from "./src/lib/tax-years.js";
+
+            const doc = readFileSync("docs/updating-tax-rates.md", "utf8");
+            const year = getTaxYear("2026-27");
+
+            // Rows look like:
+            // | Starter | 19% | £12,571 – £16,537 | `1900` | `396_700` |
+            const rows = [...doc.matchAll(
+              /^\|\s*(\w[\w\s]*?)\s*\|\s*(\d+)%\s*\|[^|]*\|\s*`(\d+)`\s*\|\s*`([\d_]+|Infinity)`\s*\|/gm,
+            )];
+
+            if (rows.length !== year.incomeTax.bands.length) {
+              throw new Error(
+                `The worked example has ${rows.length} bands, tax-years.js has ${year.incomeTax.bands.length}`,
+              );
+            }
+
+            rows.forEach(([, label, percent, basisPoints, limit], index) => {
+              const band = year.incomeTax.bands[index];
+              const expectedLimit = band.upToPence === Infinity ? "Infinity" : String(band.upToPence);
+              const documentedLimit = limit.replaceAll("_", "");
+
+              if (Number(basisPoints) !== band.rateBasisPoints) {
+                throw new Error(`${label}: doc says ${basisPoints} basis points, config says ${band.rateBasisPoints}`);
+              }
+              if (Number(percent) * 100 !== band.rateBasisPoints) {
+                throw new Error(`${label}: doc says ${percent}%, which is not ${band.rateBasisPoints} basis points`);
+              }
+              if (documentedLimit !== expectedLimit) {
+                throw new Error(`${label}: doc says upToPence ${limit}, config says ${expectedLimit}`);
+              }
+            });
+
+            console.log(`Runbook worked example matches tax-years.js across ${rows.length} bands`);
+          '
+
       - name: Guard against runtime dependencies
         run: |
           # The site must load nothing from the network. Catch the obvious ways
