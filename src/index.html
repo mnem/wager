@@ -82,6 +82,12 @@
           <p class="help" id="monthly-net-help">After income tax and National Insurance.</p>
           <p class="error" id="monthly-net-error" role="alert" hidden></p>
         </div>
+
+        <div class="field">
+          <label for="jurisdiction">Where is your main home?</label>
+          <select id="jurisdiction" name="jurisdiction"></select>
+          <p class="help">Income tax rates differ across the UK.</p>
+        </div>
       </form>
 
       <!-- Deliberately NOT a live region. It rewrites on every keystroke, which
@@ -180,7 +186,16 @@
       </section>
 
       <section class="bands" id="bands" hidden>
-        <h2>Scottish income tax bands, <span id="bands-year"></span></h2>
+        <h2><span id="bands-heading"></span></h2>
+
+        <p class="notice notice--edited" id="edited-notice" role="alert" hidden>
+          <strong>You have changed these figures.</strong> The results below no longer come from
+          the published rates, and nothing here has been checked against a government source.
+          <button type="button" class="linklike" id="reset-figures">Restore the published figures</button>
+        </p>
+
+        <p class="bands__rates-note" id="rates-note" hidden></p>
+
         <table id="table-bands">
           <thead>
             <tr>
@@ -192,6 +207,53 @@
           <tbody></tbody>
         </table>
         <p class="bands__note" id="ni-note"></p>
+
+        <!-- An escape hatch, not the main path: if the rates change before this
+             app is updated, someone can put the new figures in rather than
+             being stuck with stale ones. Collapsed so the default reading stays
+             the published, verified one. -->
+        <details class="editor" id="editor">
+          <summary>Adjust these figures</summary>
+          <div class="editor__body">
+            <p class="editor__intro">
+              Only useful if the rates have changed and this page has not caught up. Enter the
+              gross income each band runs up to, exactly as the published tables show it — the
+              conversion the calculator needs is done for you. Nothing is saved; reloading
+              restores the published figures.
+            </p>
+
+            <div class="editor__field">
+              <label for="edit-allowance">Personal allowance</label>
+              <input id="edit-allowance" type="text" inputmode="decimal" autocomplete="off" />
+            </div>
+
+            <table class="editor__table" id="editor-income-tax">
+              <caption>Income tax</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Band</th>
+                  <th scope="col">Rate %</th>
+                  <th scope="col">Up to (gross)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+
+            <table class="editor__table" id="editor-national-insurance">
+              <caption>National Insurance</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Band</th>
+                  <th scope="col">Rate %</th>
+                  <th scope="col">Up to (gross)</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+
+            <p class="error" id="editor-error" role="alert" hidden></p>
+          </div>
+        </details>
       </section>
 
       <section class="provenance">
