@@ -142,9 +142,9 @@ export function parseMoneyInput(raw) {
     // A currency symbol may be followed by a space; that one is decoration
     // rather than a separator, so it goes before the rest are given meaning.
     .trim()
-    // Non-breaking spaces reach us from pasted text and some keyboards, and
-    // read as separators just like ordinary ones.
-    .replace(/[\s\u00A0]/g, ',');
+    // `\s` already covers the non-breaking space that arrives from pasted text
+    // and some keyboards, so that needs no separate case.
+    .replace(/\s/g, ',');
 
   if (!MONEY_SHAPE.test(cleaned)) return null;
 
