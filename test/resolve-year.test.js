@@ -128,18 +128,30 @@ test('the rejected edit is never what the switch is applied to', () => {
   );
 });
 
-test('figures and year describe the same rates', () => {
+test('figures and year differ in National Insurance and nothing else', () => {
   // What the band table renders from and what the answer is calculated with
-  // must never be two different sets of numbers. Only National Insurance may
-  // differ between them.
+  // must never be two different sets of numbers.
+  //
+  // National Insurance is the single exception, so it is asserted rather than
+  // left out — a partial-equality check reads as an oversight otherwise, and
+  // the exception is the whole point of the pair existing.
   for (const niCharged of [true, false]) {
     for (const edits of [null, usableEdits()]) {
       const { figures, year } = resolveTaxYear({ published: PUBLISHED, edits, niCharged });
+      const where = `niCharged=${niCharged}, edits=${Boolean(edits)}`;
 
-      assert.deepEqual(year.incomeTax, figures.incomeTax);
-      assert.deepEqual(year.personalAllowance, figures.personalAllowance);
-      assert.deepEqual(year.publishedBands, figures.publishedBands);
-      assert.equal(year.jurisdiction, figures.jurisdiction);
+      assert.deepEqual(year.incomeTax, figures.incomeTax, where);
+      assert.deepEqual(year.personalAllowance, figures.personalAllowance, where);
+      assert.deepEqual(year.publishedBands, figures.publishedBands, where);
+      assert.equal(year.jurisdiction, figures.jurisdiction, where);
+
+      if (niCharged) {
+        assert.deepEqual(year.nationalInsurance, figures.nationalInsurance, where);
+      } else {
+        assert.notDeepEqual(year.nationalInsurance, figures.nationalInsurance, where);
+        assert.equal(chargesNationalInsurance(figures), true, `${where}: figures keep the real rates`);
+        assert.equal(chargesNationalInsurance(year), false, where);
+      }
     }
   }
 });
