@@ -13,7 +13,8 @@ what you actually need when negotiating a salary against a take-home target.
 
 It calculates using the selected jurisdiction's **income tax bands** plus
 **UK-wide employee National Insurance**, and presents a full breakdown both per
-month and per year. Scotland, England & Northern Ireland, and Wales are all
+month and per year. National Insurance can be switched off, so the same question
+can be asked of pension income — which is not liable for it at any age. Scotland, England & Northern Ireland, and Wales are all
 covered, with Scotland the default. It is an **estimate**, and the page says so
 prominently.
 
@@ -24,7 +25,7 @@ The site is deployed to GitHub Pages from this repository.
 This file is the **rules**. Two companion documents cover the *why* and the *how*:
 
 - [`docs/architecture.md`](docs/architecture.md) — how the system fits together
-  and the five decisions that shape it. Read before changing anything in
+  and the seven decisions that shape it. Read before changing anything in
   `src/lib/`.
 - [`docs/updating-tax-rates.md`](docs/updating-tax-rates.md) — the procedure for
   changing a tax figure or adding a tax year, including the gross-versus-taxable
@@ -196,6 +197,7 @@ src/lib/money.js        pence <-> pounds, parsing, GBP formatting
 src/lib/tax-years.js    declarative tax data — no logic
 src/lib/calculator.js   gross -> net, with a full breakdown
 src/lib/invert.js       net -> gross, by bisection
+src/lib/national-insurance.js  the not-charged variant of a tax year
 src/lib/validate.js     the invariants the calculator assumes but does not check
 src/lib/editable.js     published gross figures <-> stored taxable config
 test/*.test.js          node --test
