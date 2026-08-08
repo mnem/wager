@@ -27,6 +27,7 @@
 
 import { assertPence, BASIS_POINTS, roundHalfUp, basisPointsToRate } from './money.js';
 import { getTaxYear } from './tax-years.js';
+import { chargesNationalInsurance } from './national-insurance.js';
 
 const MONTHS_PER_YEAR = 12;
 
@@ -183,7 +184,7 @@ function rateForNextPound(amountPence, bands) {
  * @property {number} grossPence
  * @property {{basePence: number, taperedAwayPence: number, allowancePence: number}} personalAllowance
  * @property {{taxablePence: number, rows: BandRow[], totalPence: number}} incomeTax
- * @property {{label: string, rows: BandRow[], totalPence: number}} nationalInsurance
+ * @property {{label: string, charged: boolean, rows: BandRow[], totalPence: number}} nationalInsurance
  * @property {number} totalDeductionsPence
  * @property {number} netPence
  * @property {number} effectiveDeductionRate
@@ -239,6 +240,10 @@ export function computeAnnual(grossPence, year = getTaxYear()) {
     },
     nationalInsurance: {
       label: year.nationalInsurance.label,
+      // Carried through so the page can say National Insurance is not charged
+      // rather than presenting a row of zeroes and leaving it to be inferred.
+      // The arithmetic needs no flag: a 0% band charges nothing on its own.
+      charged: chargesNationalInsurance(year),
       rows: ni.rows,
       totalPence: sumCharges(ni.rows),
     },
@@ -336,6 +341,7 @@ export function toMonthly(annual) {
     },
     nationalInsurance: {
       label: annual.nationalInsurance.label,
+      charged: annual.nationalInsurance.charged,
       rows: niRows,
       totalPence: sumCharges(niRows),
     },
