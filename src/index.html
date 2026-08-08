@@ -56,13 +56,14 @@
       <details class="notice notice--estimate">
         <summary>
           <strong>This is an estimate</strong>, using the income tax bands for
-          <strong><span id="estimate-jurisdiction"></span></strong>
+          <strong><span id="estimate-jurisdiction"></span></strong
+          ><span id="estimate-ni"></span>
         </summary>
         <p>
-          It covers income tax for <span id="estimate-jurisdiction-body"></span> and UK-wide
-          employee National Insurance, and deliberately ignores pensions, student loans and anything
-          unusual about your tax code. Don't rely on it for anything that matters without
-          checking the figures yourself — the sources are linked at the bottom of this page.
+          <span id="estimate-body"></span> It deliberately ignores pension contributions, student
+          loans and anything unusual about your tax code. Don't rely on it for anything that
+          matters without checking the figures yourself — the sources are linked at the bottom of
+          this page.
         </p>
       </details>
 
@@ -82,7 +83,7 @@
               aria-describedby="monthly-net-help monthly-net-error"
             />
           </div>
-          <p class="help" id="monthly-net-help">After income tax and National Insurance.</p>
+          <p class="help" id="monthly-net-help"></p>
           <p class="error" id="monthly-net-error" role="alert" hidden></p>
         </div>
 
@@ -90,6 +91,27 @@
           <label for="jurisdiction">Where is your main home?</label>
           <select id="jurisdiction" name="jurisdiction"></select>
           <p class="help">Income tax rates differ across the UK.</p>
+        </div>
+
+        <!-- A checkbox rather than a pair of radios: this is one fact that is
+             either true or not, and it is true for almost everyone, so the
+             default carries no question with it. -->
+        <div class="field">
+          <label class="check" for="ni-charged">
+            <input
+              type="checkbox"
+              id="ni-charged"
+              name="ni-charged"
+              checked
+              aria-describedby="ni-charged-help"
+            />
+            <span>Deduct National Insurance</span>
+          </label>
+          <p class="help" id="ni-charged-help">
+            Turn this off to work out what a pension needs to pay. Pension income isn't liable
+            for National Insurance, and nor are earnings after State Pension age — but income tax
+            still applies to both.
+          </p>
         </div>
       </form>
 
@@ -156,10 +178,7 @@
         <details class="exclusions">
           <summary>What this doesn't include</summary>
           <div class="exclusions__body">
-            <p>
-              The calculation covers income tax for
-              <span id="exclusions-jurisdiction"></span> and employee National Insurance only.
-            </p>
+            <p id="exclusions-covers"></p>
             <p><strong>It does not account for:</strong></p>
             <ul>
               <li>pension contributions or salary sacrifice</li>
@@ -174,7 +193,9 @@
             <p><strong>Also worth knowing:</strong></p>
             <ul>
               <li id="exclusions-applies-to"></li>
-              <li>
+              <!-- Only true while National Insurance is being deducted; hidden
+                   rather than reworded, since there is nothing left to say. -->
+              <li id="exclusions-ni-timing">
                 National Insurance is worked out annually here, but real payroll calculates it
                 separately for each pay period. A real payslip may differ slightly.
               </li>
