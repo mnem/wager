@@ -198,6 +198,7 @@ src/lib/tax-years.js    declarative tax data — no logic
 src/lib/calculator.js   gross -> net, with a full breakdown
 src/lib/invert.js       net -> gross, by bisection
 src/lib/national-insurance.js  the not-charged variant of a tax year
+src/lib/resolve-year.js which config is in force: jurisdiction + edits + NI
 src/lib/validate.js     the invariants the calculator assumes but does not check
 src/lib/editable.js     published gross figures <-> stored taxable config
 test/*.test.js          node --test
