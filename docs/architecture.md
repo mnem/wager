@@ -26,6 +26,9 @@ flowchart TD
             years["tax-years.js<br/>declarative data, no logic"]
             calc["calculator.js<br/>gross → net"]
             invert["invert.js<br/>net → gross"]
+            validate["validate.js<br/>config invariants"]
+            editable["editable.js<br/>gross form ↔ taxable config"]
+            ni["national-insurance.js<br/>the not-charged variant"]
         end
     end
 
@@ -34,10 +37,16 @@ flowchart TD
     app --> invert
     app --> money
     app --> years
+    app --> validate
+    app --> editable
+    app --> ni
     invert --> calc
     calc --> years
     calc --> money
+    calc --> ni
     invert --> money
+    validate --> calc
+    editable --> calc
 
     tests["test/*.test.js<br/>node --test, no DOM"] --> lib
 ```
@@ -73,7 +82,7 @@ sequenceDiagram
     A-->>U: £41,050 and two breakdown tables
 ```
 
-## The six decisions that shape everything
+## The seven decisions that shape everything
 
 ### 1. Money is integer pence; rates are integer basis points
 
@@ -255,6 +264,41 @@ the output is a salary to negotiate with. Nobody asks for £119,999.99.
 The quoted figure is rounded **up**, never to nearest, so it always clears the
 target rather than falling a penny short.
 
+### 7. Optional deductions are a config variant, not a calculator mode
+
+Employee National Insurance can be switched off, because two ordinary cases want
+the identical income tax calculation without it: **pension income**, which is not
+earnings and so never attracts it, and **earnings after State Pension age**,
+where employee contributions stop. (The employer's own contributions continue in
+both cases, but they never appeared here — this models what leaves a payslip.)
+
+The obvious implementation is a flag on `computeAnnual`. That flag then has to
+reach `toMonthly`, `marginalRateAt`, `grossFromAnnualNet`, `salaryForMonthlyNet`
+and the validator, because each of them either calculates deductions or calls
+something that does. Six places to keep in step for one idea, and every one of
+them a place to forget.
+
+Instead `withoutNationalInsurance(year)` returns a tax year whose National
+Insurance is a single unbounded band at **0%**. That is an entirely ordinary
+config. It validates. It stays monotonic — charging nothing cannot make
+take-home pay fall — so the bisection contract is untouched. Every figure
+downstream comes out right with **no other module knowing this option exists**,
+which is the same trick jurisdictions play in decision 2.
+
+Only a `charged: false` flag travels alongside, and it never reaches the
+arithmetic: it exists so the page can say "not deducted" in words. A bare £0.00
+does not distinguish *switched off* from *earns too little*, and dropping the row
+would read as an oversight.
+
+**Apply it last.** After `getTaxYear`, and after `fromEditable` if the figures
+have been edited by hand. Applying it first hands the editor a zeroed National
+Insurance table to present as the rates in force, and anything typed into it is
+then discarded.
+
+If a future option needs the same treatment — a flat-rate pension deduction, say
+— this is the shape to copy: express it as a tax year the calculator already
+knows how to read.
+
 ## Module reference
 
 | Module | Exports | Notes |
@@ -264,6 +308,8 @@ target rather than falling a penny short.
 | `validate.js` | `validateTaxYear`, `assertValidTaxYear` | The invariants the calculator assumes but does not check |
 | `calculator.js` | `computeAnnual`, `toMonthly`, `personalAllowanceFor`, `applyBands`, `marginalRateAt` | **No tax figures.** Reads them from the config it is given |
 | `invert.js` | `salaryForMonthlyNet`, `grossFromAnnualNet`, `grossFromMonthlyNet` | `salaryForMonthlyNet` is what the UI uses |
+| `national-insurance.js` | `withoutNationalInsurance`, `chargesNationalInsurance` | A config variant, not a calculator mode. Apply last |
+| `editable.js` | `toEditable`, `fromEditable`, `isUnchanged` | The escape hatch: gross-denominated form ↔ taxable config |
 | `app.js` | — | DOM wiring only |
 | `version.js` | `BUILD` | Committed dev stub, regenerated at deploy |
 
@@ -285,6 +331,8 @@ about two seconds.
 | `calculator.test.js` | Known values at every published boundary, the £112,570 regression |
 | `invert.test.js` | Contract edge cases, plateaus, bracket termination |
 | `roundtrip.test.js` | ~2,900 gross values swept: `net(g) >= target` **and** `net(g-1) < target` |
+| `editable.test.js` | That an untouched round trip changes nothing, and the taper conversion at every boundary |
+| `national-insurance.test.js` | That switching it off leaves income tax byte-identical, and the config it produces is valid exhaustively |
 
 Two deserve special mention.
 
@@ -381,3 +429,7 @@ rates wherever you live).
 National Insurance is calculated annually; real payroll calculates it per pay
 period, so a real payslip can differ slightly. All of this is stated on the page
 rather than only here.
+
+National Insurance *can* be switched off — see decision 7 — but that is the only
+deduction that is optional, and it is all-or-nothing. There is no partial rate,
+no employer's contribution, and no Class 2 or Class 4 for the self-employed.
