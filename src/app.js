@@ -16,20 +16,26 @@ import { salaryForMonthlyNet } from './lib/invert.js';
 import { getTaxYear, listJurisdictions, DEFAULT_JURISDICTION_ID } from './lib/tax-years.js';
 import { toEditable, fromEditable, isUnchanged } from './lib/editable.js';
 import { validateTaxYear } from './lib/validate.js';
+import {
+  withoutNationalInsurance,
+  chargesNationalInsurance,
+} from './lib/national-insurance.js';
 import { BUILD } from './version.js';
 
 const TAX_YEAR_ID = '2026-27';
 
 /**
- * Which jurisdiction's figures are shown, and any edits made to them.
+ * Which jurisdiction's figures are shown, whether National Insurance is being
+ * deducted, and any edits made to the figures.
  *
  * `year` is always the config actually being calculated with — the published
- * one, or the edited one. Everything on the page renders from it, so there is
- * no way for the tables to show one set of figures while the answer uses
- * another.
+ * one, or the edited one, with or without National Insurance. Everything on the
+ * page renders from it, so there is no way for the tables to show one set of
+ * figures while the answer uses another.
  */
 const state = {
   jurisdictionId: DEFAULT_JURISDICTION_ID,
+  niCharged: true,
   year: getTaxYear(TAX_YEAR_ID, DEFAULT_JURISDICTION_ID),
   edits: null,
 };
@@ -40,6 +46,7 @@ const ANNOUNCE_DELAY_MS = 600;
 const el = {
   form: document.getElementById('calculator'),
   input: document.getElementById('monthly-net'),
+  inputHelp: document.getElementById('monthly-net-help'),
   error: document.getElementById('monthly-net-error'),
   result: document.getElementById('result'),
   liveStatus: document.getElementById('live-status'),
@@ -69,11 +76,15 @@ const el = {
   editAllowance: document.getElementById('edit-allowance'),
   editorIncomeTax: document.querySelector('#editor-income-tax tbody'),
   editorNationalInsurance: document.querySelector('#editor-national-insurance tbody'),
+  editorNationalInsuranceTable: document.getElementById('editor-national-insurance'),
   editorError: document.getElementById('editor-error'),
+  niCharged: document.getElementById('ni-charged'),
   estimateJurisdiction: document.getElementById('estimate-jurisdiction'),
-  estimateJurisdictionBody: document.getElementById('estimate-jurisdiction-body'),
-  exclusionsJurisdiction: document.getElementById('exclusions-jurisdiction'),
+  estimateNi: document.getElementById('estimate-ni'),
+  estimateBody: document.getElementById('estimate-body'),
+  exclusionsCovers: document.getElementById('exclusions-covers'),
   exclusionsAppliesTo: document.getElementById('exclusions-applies-to'),
+  exclusionsNiTiming: document.getElementById('exclusions-ni-timing'),
 };
 
 /* Colour scheme ------------------------------------------------------------ */
@@ -156,21 +167,41 @@ function storedJurisdiction() {
   }
 }
 
+/** Remembered too: whether you are liable is not a per-visit decision either. */
+const NI_STORAGE_KEY = 'wager:national-insurance';
+
+function storedNiCharged() {
+  try {
+    // Only an explicit opt-out counts, so a missing or corrupted value leaves
+    // National Insurance deducted — which is right for almost everyone.
+    return localStorage.getItem(NI_STORAGE_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
+
 /**
- * Rebuild the tax year from the current jurisdiction and any edits.
+ * Rebuild the tax year from the current jurisdiction, National Insurance
+ * choice, and any edits.
  *
  * Edits are discarded when the jurisdiction changes: they were made against a
  * different set of bands, and silently carrying a Scottish starter-rate change
- * onto the Welsh table would be worse than losing it.
+ * onto the Welsh table would be worse than losing it. The National Insurance
+ * switch keeps them, because it changes nothing about the bands themselves.
  *
  * @returns {string[]} problems with the edited figures, empty when they are fine
  */
 function rebuildYear() {
   const published = getTaxYear(TAX_YEAR_ID, state.jurisdictionId);
 
+  // Applied last, to whatever the figures turned out to be. Doing it first
+  // would hand the editor a zeroed National Insurance table to present as the
+  // rates in force, and anything typed into it would then be thrown away.
+  const withChoice = (year) => (state.niCharged ? year : withoutNationalInsurance(year));
+
   if (!state.edits || isUnchanged(state.edits, published)) {
     state.edits = null;
-    state.year = published;
+    state.year = withChoice(published);
     return [];
   }
 
@@ -179,8 +210,25 @@ function rebuildYear() {
 
   // Keep calculating with the last good figures rather than showing nothing,
   // but say plainly that the edits are not being used.
-  if (problems.length === 0) state.year = candidate;
+  if (problems.length === 0) state.year = withChoice(candidate);
   return problems;
+}
+
+function setUpNationalInsurance() {
+  state.niCharged = storedNiCharged();
+  el.niCharged.checked = state.niCharged;
+
+  el.niCharged.addEventListener('change', () => {
+    state.niCharged = el.niCharged.checked;
+    try {
+      localStorage.setItem(NI_STORAGE_KEY, state.niCharged ? 'on' : 'off');
+    } catch {
+      // Storage unavailable; the choice still applies for this visit.
+    }
+    rebuildYear();
+    renderTaxYearInfo();
+    update();
+  });
 }
 
 function setUpJurisdiction() {
@@ -430,8 +478,13 @@ function renderBreakdown(body, period) {
       className: 'is-band is-deduction',
     });
   }
+  // Still shown when it is not being deducted, and said in words rather than
+  // left as a bare zero. A missing row would read as an oversight, and £0.00 on
+  // its own does not distinguish "switched off" from "earns too little".
   addRow(body, {
-    label: 'National Insurance',
+    label: period.nationalInsurance.charged
+      ? 'National Insurance'
+      : 'National Insurance — not deducted',
     amount: formatGBP(period.nationalInsurance.totalPence),
     className: 'is-subtotal is-deduction',
   });
@@ -452,17 +505,33 @@ function renderBreakdown(body, period) {
 
 function renderTaxYearInfo() {
   const YEAR = state.year;
+  const niCharged = chargesNationalInsurance(YEAR);
 
   el.bandsHeading.textContent = `${YEAR.jurisdiction} income tax bands, ${YEAR.label}`;
 
-  // The always-visible estimate notice and the exclusions both name a
-  // jurisdiction. Left static they would tell most of the country something
-  // untrue, so they follow the picker like everything else.
+  // What "take home" means depends on what is being deducted, so the one label
+  // that defines the number being typed in has to follow the switch too.
+  el.inputHelp.textContent = niCharged
+    ? 'After income tax and National Insurance.'
+    : 'After income tax.';
+
+  // The always-visible estimate notice and the exclusions both describe what is
+  // being calculated. Left static they would tell most of the country something
+  // untrue, so they follow the controls like everything else.
   el.estimateJurisdiction.textContent = YEAR.jurisdiction;
-  el.estimateJurisdictionBody.textContent = YEAR.jurisdiction;
-  el.exclusionsJurisdiction.textContent = YEAR.jurisdiction;
-  el.exclusionsAppliesTo.textContent =
-    `These rates apply to earned income for ${YEAR.appliesTo}. If that isn't you, choose where you live above.`;
+  el.estimateNi.textContent = niCharged ? '' : ', with no National Insurance';
+  el.estimateBody.textContent = niCharged
+    ? `It covers income tax for ${YEAR.jurisdiction} and UK-wide employee National Insurance.`
+    : `It covers income tax for ${YEAR.jurisdiction} only — you have turned National Insurance off, which is right for pension income and for earnings after State Pension age.`;
+
+  el.exclusionsCovers.textContent = niCharged
+    ? `The calculation covers income tax for ${YEAR.jurisdiction} and employee National Insurance only.`
+    : `The calculation covers income tax for ${YEAR.jurisdiction} only. National Insurance is not being deducted.`;
+  el.exclusionsNiTiming.hidden = !niCharged;
+
+  el.exclusionsAppliesTo.textContent = niCharged
+    ? `These rates apply to earned income for ${YEAR.appliesTo}. If that isn't you, choose where you live above.`
+    : `These rates apply to ${YEAR.appliesTo}. If that isn't you, choose where you live above.`;
 
   // The edited warning replaces the verification claim rather than sitting
   // alongside it, so the page never says "verified" about figures it was handed.
@@ -495,13 +564,24 @@ function renderTaxYearInfo() {
     cell.classList.remove('numeric');
   }
 
+  // Only the bands that actually charge something are worth listing. With the
+  // switch off there are none — and there are also none if someone edits every
+  // rate to zero, which would otherwise leave the sentence trailing off.
   const ni = YEAR.nationalInsurance.bands.filter((band) => band.rateBasisPoints > 0);
-  el.niNote.textContent = `National Insurance is UK-wide and applies on top: ${ni
-    .map(
-      (band) =>
-        `${formatPercent(basisPointsToRate(band.rateBasisPoints))} ${band.label.toLowerCase()}`,
-    )
-    .join(', ')}.`;
+  el.niNote.textContent =
+    ni.length === 0
+      ? 'National Insurance is not being deducted, so only the income tax bands above apply.'
+      : `National Insurance is UK-wide and applies on top: ${ni
+          .map(
+            (band) =>
+              `${formatPercent(basisPointsToRate(band.rateBasisPoints))} ${band.label.toLowerCase()}`,
+          )
+          .join(', ')}.`;
+
+  // An editable table that cannot change the answer is worse than no table, so
+  // it goes while National Insurance is switched off. The rows stay in the DOM,
+  // so anything already typed comes back when it is switched on again.
+  el.editorNationalInsuranceTable.hidden = !niCharged;
 
   el.verifiedOn.textContent = YEAR.verifiedOn
     ? `Rates and thresholds for ${YEAR.jurisdiction}, ${YEAR.label}, last checked against the primary sources on ${YEAR.verifiedOn}.`
@@ -589,9 +669,10 @@ function update() {
     suggestion.monthly.grossPence,
   )} a month before deductions, taking home ${formatGBP(suggestion.monthly.netPence)}.`;
 
+  const withoutNi = chargesNationalInsurance(YEAR) ? '' : ' National Insurance is not deducted.';
   el.breakdownIntro.textContent = YEAR.edited
-    ? `Based on figures you changed by hand, not the published rates for ${YEAR.label}.`
-    : `Based on ${YEAR.jurisdiction} income tax bands for ${YEAR.label}. Figures may differ by a penny from a payslip, because payroll rounds each pay period separately.`;
+    ? `Based on figures you changed by hand, not the published rates for ${YEAR.label}.${withoutNi}`
+    : `Based on ${YEAR.jurisdiction} income tax bands for ${YEAR.label}.${withoutNi} Figures may differ by a penny from a payslip, because payroll rounds each pay period separately.`;
 
   renderBreakdown(el.annualBody, suggestion.annual);
   renderBreakdown(el.monthlyBody, suggestion.monthly);
@@ -622,6 +703,7 @@ el.input.addEventListener('input', update);
 
 setUpTheme();
 setUpJurisdiction();
+setUpNationalInsurance();
 rebuildYear();
 renderEditor();
 el.editor.addEventListener('input', onEdit);
