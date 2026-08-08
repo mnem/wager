@@ -29,6 +29,7 @@ flowchart TD
             validate["validate.js<br/>config invariants"]
             editable["editable.js<br/>gross form ↔ taxable config"]
             ni["national-insurance.js<br/>the not-charged variant"]
+            resolve["resolve-year.js<br/>which config is in force"]
         end
     end
 
@@ -37,9 +38,12 @@ flowchart TD
     app --> invert
     app --> money
     app --> years
-    app --> validate
+    app --> resolve
     app --> editable
     app --> ni
+    resolve --> editable
+    resolve --> validate
+    resolve --> ni
     invert --> calc
     calc --> years
     calc --> money
@@ -299,6 +303,21 @@ If a future option needs the same treatment — a flat-rate pension deduction, s
 — this is the shape to copy: express it as a tax year the calculator already
 knows how to read.
 
+**The order the choices combine in is itself logic, so it lives in
+`resolve-year.js` rather than in `app.js`.** It was written in `app.js` first,
+and got it wrong. Invalid edits deliberately fall back to the last good figures
+rather than showing nothing — and the switch was applied *inside* that fallback.
+So with a bad edit outstanding, flipping the switch flipped the checkbox and
+stored the preference while the figures carried on deducting National Insurance,
+and every line of copy on the page carried on saying so. The control and the
+numbers disagreed, with only an unrelated edit warning to hint at it.
+
+`app.js` has no tests by design, which is exactly why that class of rule does not
+belong there. Extracting it made the bug expressible as a test, and
+`test/resolve-year.test.js` now pins it: **a rejected edit must never be able to
+hold the switch stale, because flipping the switch can never itself be
+invalid.**
+
 ## Module reference
 
 | Module | Exports | Notes |
@@ -310,6 +329,7 @@ knows how to read.
 | `invert.js` | `salaryForMonthlyNet`, `grossFromAnnualNet`, `grossFromMonthlyNet` | `salaryForMonthlyNet` is what the UI uses |
 | `national-insurance.js` | `withoutNationalInsurance`, `chargesNationalInsurance` | A config variant, not a calculator mode. Apply last |
 | `editable.js` | `toEditable`, `fromEditable`, `isUnchanged` | The escape hatch: gross-denominated form ↔ taxable config |
+| `resolve-year.js` | `resolveTaxYear` | Which config is in force, given the jurisdiction, any edits, and the switch |
 | `app.js` | — | DOM wiring only |
 | `version.js` | `BUILD` | Committed dev stub, regenerated at deploy |
 
@@ -333,6 +353,7 @@ about two seconds.
 | `roundtrip.test.js` | ~2,900 gross values swept: `net(g) >= target` **and** `net(g-1) < target` |
 | `editable.test.js` | That an untouched round trip changes nothing, and the taper conversion at every boundary |
 | `national-insurance.test.js` | That switching it off leaves income tax byte-identical, and the config it produces is valid exhaustively |
+| `resolve-year.test.js` | That the three choices combine in the right order, and a rejected edit cannot pin the switch |
 
 Two deserve special mention.
 

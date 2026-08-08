@@ -14,12 +14,9 @@ import {
 } from './lib/money.js';
 import { salaryForMonthlyNet } from './lib/invert.js';
 import { getTaxYear, listJurisdictions, DEFAULT_JURISDICTION_ID } from './lib/tax-years.js';
-import { toEditable, fromEditable, isUnchanged } from './lib/editable.js';
-import { validateTaxYear } from './lib/validate.js';
-import {
-  withoutNationalInsurance,
-  chargesNationalInsurance,
-} from './lib/national-insurance.js';
+import { toEditable, isUnchanged } from './lib/editable.js';
+import { resolveTaxYear } from './lib/resolve-year.js';
+import { chargesNationalInsurance } from './lib/national-insurance.js';
 import { BUILD } from './version.js';
 
 const TAX_YEAR_ID = '2026-27';
@@ -28,14 +25,22 @@ const TAX_YEAR_ID = '2026-27';
  * Which jurisdiction's figures are shown, whether National Insurance is being
  * deducted, and any edits made to the figures.
  *
- * `year` is always the config actually being calculated with — the published
- * one, or the edited one, with or without National Insurance. Everything on the
- * page renders from it, so there is no way for the tables to show one set of
- * figures while the answer uses another.
+ * The two config fields are deliberately separate:
+ *
+ * - `figures` is which rates and bands are in force — published, or edited by
+ *   hand. Invalid edits leave it at the last good set.
+ * - `year` is those figures plus the National Insurance choice, and is what
+ *   everything actually calculates and renders from. So there is no way for the
+ *   tables to show one set of figures while the answer uses another.
+ *
+ * Keeping them apart is what stops the switch getting caught up in the
+ * last-good-figures rule. It is not one of the editable figures, so a bad edit
+ * must not be able to hold it stale.
  */
 const state = {
   jurisdictionId: DEFAULT_JURISDICTION_ID,
   niCharged: true,
+  figures: getTaxYear(TAX_YEAR_ID, DEFAULT_JURISDICTION_ID),
   year: getTaxYear(TAX_YEAR_ID, DEFAULT_JURISDICTION_ID),
   edits: null,
 };
@@ -194,23 +199,20 @@ function storedNiCharged() {
 function rebuildYear() {
   const published = getTaxYear(TAX_YEAR_ID, state.jurisdictionId);
 
-  // Applied last, to whatever the figures turned out to be. Doing it first
-  // would hand the editor a zeroed National Insurance table to present as the
-  // rates in force, and anything typed into it would then be thrown away.
-  const withChoice = (year) => (state.niCharged ? year : withoutNationalInsurance(year));
+  // Opening the editor and changing nothing is not an edit, and should not put
+  // the page into its edited state. That is a question about this form, so it
+  // stays here; how the choices combine is not, and lives in resolve-year.js.
+  if (state.edits && isUnchanged(state.edits, published)) state.edits = null;
 
-  if (!state.edits || isUnchanged(state.edits, published)) {
-    state.edits = null;
-    state.year = withChoice(published);
-    return [];
-  }
+  const { figures, year, problems } = resolveTaxYear({
+    published,
+    edits: state.edits,
+    niCharged: state.niCharged,
+    lastGoodFigures: state.figures,
+  });
 
-  const candidate = fromEditable(state.edits, published);
-  const problems = validateTaxYear(candidate);
-
-  // Keep calculating with the last good figures rather than showing nothing,
-  // but say plainly that the edits are not being used.
-  if (problems.length === 0) state.year = withChoice(candidate);
+  state.figures = figures;
+  state.year = year;
   return problems;
 }
 
